@@ -210,6 +210,25 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
 - **Alasan:** Menjaga satu sumber kebenaran & konsistensi (edit/hapus otomatis benar).
 - **Status:** aktif.
 
+## 2026-09-12 — Budget/target/alert = logika deterministik di engine
+- **Keputusan:** Evaluasi batas pengeluaran, target pemasukan (per hari/minggu/
+  bulan), anggaran per kategori, dan ambang alert ada di `financial_engine/
+  budgeting.py` (murni, memakai cash_flow/expense_by_category). Pengaturan
+  disimpan sebagai JSON di tabel `settings`. Alert dihasilkan sebagai daftar
+  siap-kirim; pengiriman email terpisah (adapter).
+- **Alasan:** Konsisten — semua perhitungan finansial deterministik & teruji,
+  bukan di frontend.
+- **Status:** aktif.
+
+## 2026-09-12 — Alert email via adapter tergated env; auth token opsional
+- **Keputusan:** Email dikirim lewat `server/email_alert.py` (smtplib stdlib),
+  aktif hanya bila `SMTP_HOST`+`SMTP_FROM` diset; jika tidak, alert in-app saja.
+  Auth diaktifkan dengan menyetel `CATATAN_TOKEN` (API butuh token); default lokal
+  tanpa auth. Deploy didokumentasikan di `docs/DEPLOY.md`.
+- **Alasan:** Menjaga app bisa jalan tanpa konfigurasi (lokal) namun siap di-deploy
+  aman; hindari dependency & kredensial wajib di MVP.
+- **Status:** aktif (WhatsApp tetap ditunda; multi-user/login proper menyusul).
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->

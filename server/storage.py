@@ -6,6 +6,7 @@ Engine. Transaksi = sumber kebenaran, saldo = turunan.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
 from datetime import datetime
@@ -36,7 +37,14 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_tx_occurred ON transactions(occurred_at);
+CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    data TEXT NOT NULL
+);
 """
+
+_EDITABLE_TX = ("amount", "category", "note", "occurred_at",
+                "from_account_id", "to_account_id")
 
 
 class Storage:
@@ -96,6 +104,34 @@ class Storage:
         cur = self._db.execute("UPDATE transactions SET deleted=1 WHERE id=?", (tx_id,))
         self._db.commit()
         return cur.rowcount > 0
+
+    def update_transaction(self, tx_id: str, fields: Dict[str, Any]) -> bool:
+        cols = [k for k in fields if k in _EDITABLE_TX]
+        if not cols:
+            return False
+        sets = ", ".join(f"{c}=?" for c in cols)
+        params = [fields[c] for c in cols] + [tx_id]
+        cur = self._db.execute(f"UPDATE transactions SET {sets} WHERE id=?", params)
+        self._db.commit()
+        return cur.rowcount > 0
+
+    # ---- settings (JSON tunggal) ------------------------------------ #
+    def get_settings(self) -> Dict[str, Any]:
+        row = self._db.execute("SELECT data FROM settings WHERE id=1").fetchone()
+        if not row:
+            return {}
+        try:
+            return json.loads(row["data"])
+        except (ValueError, TypeError):
+            return {}
+
+    def save_settings(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        payload = json.dumps(data, ensure_ascii=False)
+        self._db.execute(
+            "INSERT INTO settings(id,data) VALUES(1,?) "
+            "ON CONFLICT(id) DO UPDATE SET data=excluded.data", (payload,))
+        self._db.commit()
+        return data
 
     def close(self) -> None:
         self._db.close()

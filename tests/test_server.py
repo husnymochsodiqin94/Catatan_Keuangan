@@ -91,5 +91,47 @@ class TestSummaryPersistence(BaseCase):
         self.assertEqual(summ["total_balance"], 14_000_000)
 
 
+class TestSettingsBudgetEdit(BaseCase):
+    def test_settings_roundtrip(self):
+        service.update_settings(self.s, {"alert_threshold": 80, "alert_email": "a@b.com",
+                                         "spending_limit": {"period": "monthly", "amount": 3_000_000}})
+        cfg = service.get_settings(self.s)
+        self.assertEqual(cfg["alert_threshold"], 80)
+        self.assertEqual(cfg["alert_email"], "a@b.com")
+        self.assertEqual(cfg["spending_limit"]["amount"], 3_000_000)
+
+    def test_budget_status_alert(self):
+        ref = datetime(2026, 9, 15, 12)
+        service.create_transaction(self.s, {"type": "expense", "amount": 2_700_000,
+            "account_id": self.bca["id"], "occurred_at": datetime(2026, 9, 3, 10).isoformat()})
+        service.update_settings(self.s, {"alert_threshold": 90,
+            "spending_limit": {"period": "monthly", "amount": 3_000_000}})
+        st = service.budget_status(self.s, ref)
+        self.assertEqual(st["spending_limit"]["pct"], 90)
+        self.assertTrue(st["spending_limit"]["alert"])
+        self.assertTrue(st["alerts"])
+
+    def test_edit_transaction(self):
+        res = service.create_transaction(self.s, {"type": "expense", "amount": 100_000,
+            "account_id": self.bca["id"], "occurred_at": datetime(2026, 9, 10, 10).isoformat()})
+        tx_id = res["transaction"]["id"]
+        service.edit_transaction(self.s, tx_id, {"amount": 40_000, "category": "Transport"})
+        summ = service.summary(self.s, 2026, 9)
+        self.assertEqual(summ["expense"], 40_000)
+        rows = service.list_transactions(self.s)
+        self.assertEqual(rows[0]["amount"], 40_000)
+        self.assertEqual(rows[0]["category"], "Transport")
+
+    def test_send_alerts_tanpa_email_config(self):
+        service.create_transaction(self.s, {"type": "expense", "amount": 3_000_000,
+            "account_id": self.bca["id"], "occurred_at": datetime.now().isoformat()})
+        service.update_settings(self.s, {"alert_email": "a@b.com",
+            "spending_limit": {"period": "monthly", "amount": 1_000_000}})
+        out = service.send_alerts(self.s)
+        self.assertFalse(out["sent"])
+        self.assertIn("email", out["reason"])
+        self.assertTrue(out["alerts"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ from .storage import Storage
 
 WEBAPP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "webapp"))
 _STORAGE = Storage(os.environ.get("CATATAN_DB", "data.db"))
+_TOKEN = os.environ.get("CATATAN_TOKEN")  # bila diset, API butuh token (untuk deploy)
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
@@ -56,10 +57,22 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):  # senyapkan log default
         pass
 
+    def _auth_ok(self, path: str) -> bool:
+        """Bila CATATAN_TOKEN diset, endpoint /api (selain health) butuh token."""
+        if not _TOKEN or path == "/api/health" or not path.startswith("/api/"):
+            return True
+        tok = self.headers.get("X-Token") or parse_qs(urlparse(self.path).query).get("token", [None])[0]
+        if tok == _TOKEN:
+            return True
+        self._json({"error": "unauthorized"}, 401)
+        return False
+
     # ---- dispatch --------------------------------------------------- #
     def do_GET(self):
         parsed = urlparse(self.path)
         path, qs = parsed.path, parse_qs(parsed.query)
+        if not self._auth_ok(path):
+            return
         try:
             if path == "/api/health":
                 return self._json({"ok": True})
@@ -71,6 +84,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(service.list_transactions(
                     _STORAGE, type=qs.get("type", [None])[0],
                     text=qs.get("q", [None])[0], account_id=qs.get("account_id", [None])[0]))
+            if path == "/api/settings":
+                return self._json(service.get_settings(_STORAGE))
+            if path == "/api/budget":
+                return self._json(service.budget_status(_STORAGE))
             if path.startswith("/api/"):
                 return self._json({"error": "not found"}, 404)
             return self._serve_static(path)
@@ -81,6 +98,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if not self._auth_ok(path):
+            return
         data = self._read_json()
         try:
             if path == "/api/accounts":
@@ -91,6 +110,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(service.parse_text(_STORAGE, data.get("text", "")))
             if path == "/api/transactions":
                 return self._json(service.create_transaction(_STORAGE, data), 201)
+            if path == "/api/settings":
+                return self._json(service.update_settings(_STORAGE, data))
+            if path == "/api/alerts/send":
+                return self._json(service.send_alerts(_STORAGE))
             return self._json({"error": "not found"}, 404)
         except (ValidationError, ValueError) as exc:
             return self._json({"error": str(exc)}, 400)
@@ -99,11 +122,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = urlparse(self.path).path
+        if not self._auth_ok(path):
+            return
         try:
             prefix = "/api/transactions/"
             if path.startswith(prefix):
                 tx_id = path[len(prefix):]
                 return self._json(service.delete_transaction(_STORAGE, tx_id))
+            return self._json({"error": "not found"}, 404)
+        except (ValidationError, ValueError) as exc:
+            return self._json({"error": str(exc)}, 400)
+        except Exception:
+            return self._json({"error": "kesalahan server"}, 500)
+
+    def do_PATCH(self):
+        path = urlparse(self.path).path
+        if not self._auth_ok(path):
+            return
+        data = self._read_json()
+        try:
+            prefix = "/api/transactions/"
+            if path.startswith(prefix):
+                tx_id = path[len(prefix):]
+                return self._json(service.edit_transaction(_STORAGE, tx_id, data))
             return self._json({"error": "not found"}, 404)
         except (ValidationError, ValueError) as exc:
             return self._json({"error": str(exc)}, 400)

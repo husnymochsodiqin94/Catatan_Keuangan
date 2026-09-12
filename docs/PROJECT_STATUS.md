@@ -3,12 +3,12 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 11 — PWA + backend tersambung ke Financial Engine (MVP jalan).** Platform: **PWA** (mobile + web + laptop), backend Python stdlib + SQLite. Smoke-test end-to-end OK.
+**Tahap 12 — Fitur lengkap MVP+: budget/target/alert, edit, auth opsional, layout desktop.** PWA + backend Python stdlib + SQLite. Smoke-test end-to-end OK.
 
-Alur nyata berfungsi: buka app → capture (suara/teks) → `POST /api/parse` → konfirmasi draft → `POST /api/transactions` (validasi + simpan via engine) → dashboard (`/api/summary`, semua angka dari engine). Mockup (design canvas, Versi 6) tetap sebagai referensi desain.
+Berfungsi: capture (suara/teks) → parse → konfirmasi → simpan; dashboard; riwayat (search/filter/**edit**/hapus); **Anggaran** (batas pengeluaran & target pemasukan per hari/minggu/bulan, anggaran per kategori, status & alert); **banner alert** di Beranda; **auth token opsional** (`CATATAN_TOKEN`) & **alert email** (`SMTP_*`) untuk deploy; **layout desktop** (sidebar) responsif. Semua angka dari engine.
 
-**Cara jalankan:** `python3 -m server.app` → http://127.0.0.1:8000.
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **67 test OK**.
+**Cara jalankan:** `python3 -m server.app` → http://127.0.0.1:8000. Deploy & env: `docs/DEPLOY.md`.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **78 test OK**.
 
 ## Roadmap Fitur (dari masukan user, 2026-09-12)
 - **Sudah ada di engine (tinggal disambungkan ke UI):** transfer antar akun, e-wallet, kartu kredit/liabilitas (utang dasar).
@@ -40,7 +40,10 @@ Alur nyata berfungsi: buka app → capture (suara/teks) → `POST /api/parse` �
 - [x] **Test** (`tests/test_reporting.py`): angka dashboard = engine, expense-per-kategori neto & terurut, recent, filter/search/account, edit & delete memengaruhi saldo/dashboard. 9 test OK.
 - [x] **Backend** (`server/`): Storage SQLite (stdlib) + service (rehidrasi engine, validasi, simpan) + HTTP server (API JSON `/api/accounts|parse|transactions|summary` + penyajian PWA). Nol dependency pihak ketiga.
 - [x] **PWA** (`webapp/`): index/app.js/styles + manifest + service worker; Home/Riwayat/Akun + capture (Web Speech id-ID + teks) → parse → confirm → simpan; onboarding & error/loading state; semua angka dari backend.
-- [x] **Test** (`tests/test_server.py`): akun, parse resolve akun, commit+persist, transfer netral, delete recompute, persistensi lintas rehidrasi. 8 test OK.
+- [x] **Test** (`tests/test_server.py`): akun, parse, commit+persist, transfer, delete, persistensi, settings, budget status, edit, alerts. 12 test OK.
+- [x] **Budgeting** (`financial_engine/budgeting.py`): batas pengeluaran & target pemasukan per periode (harian/mingguan/bulanan), anggaran per kategori, evaluasi ambang & daftar alert (deterministik). Test `tests/test_budgeting.py` (7 OK).
+- [x] **Alert email** (`server/email_alert.py`): pengiriman via SMTP (stdlib), aktif bila dikonfigurasi (`SMTP_*`); jika tidak, alert in-app.
+- [x] **Auth opsional** (`CATATAN_TOKEN`) & **panduan deploy** (`docs/DEPLOY.md`).
 - [x] **Audit MVP** (`docs/AUDIT_REPORT.md`): financial accuracy, AI, security, performance, token/AI-cost. Defect diperbaiki: A1 splitter "hari lalu", A2 angka frasa waktu jadi nominal, P1 repeated processing di `net_worth`. Regresi `TestTemporalNotAmount` ditambahkan.
 
 ## Temuan Audit Terbuka (belum dikerjakan — bukan defect diam-diam)

@@ -88,3 +88,23 @@ label.fl{display:block;font-size:12px;color:var(--muted);margin:10px 2px 5px;fon
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:11px 18px;border-radius:999px;font-weight:700;opacity:0;transition:.25s;z-index:30}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:var(--out)}
+/* alert banner (home) */
+.alert-banner{display:flex;gap:11px;align-items:flex-start;background:var(--warnbg);border:1px solid #fde68a;color:var(--warn);border-radius:14px;padding:11px 13px;margin-bottom:12px;font-size:13px}
+.alert-banner.over{background:#fdecec;border-color:#f6c9c9;color:var(--out)}
+.alert-banner b{display:block}
+.alert-banner div div{font-size:12px;margin-top:1px}
+/* ---- Desktop / laptop (sidebar) ---- */
+@media(min-width:860px){
+  .app{max-width:1000px;display:grid;grid-template-columns:220px 1fr;grid-template-areas:"nav top" "nav view";
+    column-gap:24px;padding:24px 24px 40px}
+  #topbar{grid-area:top}
+  .view{grid-area:view}
+  .nav{grid-area:nav;position:sticky;top:24px;height:max-content;align-self:start;flex-direction:column;justify-content:flex-start;
+    align-items:stretch;border:1px solid var(--line);border-top:1px solid var(--line);border-radius:16px;padding:16px 12px;gap:4px;background:#fff}
+  .nav a{flex-direction:row;justify-content:flex-start;gap:12px;width:auto;font-size:14px;padding:11px 12px;border-radius:11px}
+  .nav a.on{background:#eef4ff}
+  .nav .nav-spacer{display:none}
+  .fab{left:auto;right:32px;bottom:32px;transform:none}
+  .cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .sheet-inner{max-width:520px;border-radius:20px;margin-bottom:24px}
+}
