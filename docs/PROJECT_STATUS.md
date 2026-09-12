@@ -3,9 +3,9 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 5 — Financial Engine (core) selesai & teruji.** Baru modul inti; belum ada API/UI/AI.
+**Tahap 6 — AI Transaction Parser (rule-based) selesai & teruji.** Belum ada API/UI/voice/LLM nyata.
 
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **24 test OK**.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **41 test OK**.
 
 ## Sudah Dikerjakan
 - [x] Inisialisasi repository git (branch `claude/financial-assistant-setup-n1aqkd`).
@@ -22,11 +22,14 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] `docs/prototype/index.html` — prototipe UX statis alur inti Capture→Preview→Simpan (parser tiruan, tanpa backend/AI).
 - [x] **Financial Engine** (`financial_engine/`): create income/expense/transfer/refund, balance, cash flow, net worth, validasi transaksi, deteksi duplikat. Python, tanpa dependency.
 - [x] **Test** (`tests/test_financial_engine.py`): income, expense, transfer, refund, balance, multiple accounts, credit card (anti double-counting), duplikat, validasi. 24 test OK.
+- [x] **AI Transaction Parser** (`nlp/`): schema `ParsedTransaction` + `validate_schema`; antarmuka `TransactionParser` + `RuleBasedParser` (deterministik, id-ID); `ParsePipeline` (parse → schema → business validation → siap ke Financial Engine, tanpa persistensi; `commit()` eksplisit, `apply_correction()`).
+- [x] **Test** (`tests/test_nlp_parser.py`): expense, income, transfer, multiple, natural date, nominal Indonesia, missing account, ambiguous/bukan-transaksi, correction, duplicate. 17 test OK.
 
 ## Belum Dikerjakan
 - [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database, UX) — blocker sebelum lapisan lain.
-- [ ] Adjustment: efek sudah didukung di engine (untuk balance), tetapi belum ada `create_adjustment` publik (di luar lingkup task ini).
-- [ ] Lapisan berikutnya (belum diminta): persistence/DB, validation layer API, AI adapter, voice, UI.
+- [ ] **Adapter LLM nyata**: `RuleBasedParser` adalah implementasi/fallback offline; adapter LLM (provider TBD) tinggal mengimplementasikan `TransactionParser`. Menunggu keputusan provider.
+- [ ] Adjustment: efek sudah didukung di engine (untuk balance), belum ada `create_adjustment` publik.
+- [ ] Lapisan berikutnya (belum diminta): persistence/DB, endpoint API, voice, UI.
 
 ## Catatan Konsistensi Aturan (perlu perhatian, tidak memblokir)
 - `FINANCIAL_RULES.md` #3 menaruh "refund ke credit card" pada kolom `from_account_id`,

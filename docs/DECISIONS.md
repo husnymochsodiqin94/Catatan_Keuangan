@@ -108,6 +108,25 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
 - **Tindak lanjut:** selaraskan tabel #3 di FINANCIAL_RULES pada revisi berikutnya.
 - **Status:** aktif.
 
+## 2026-09-12 — AI Parser diimplementasikan sebagai adapter rule-based (LLM ditunda)
+- **Keputusan:** Parser NL→transaksi dibangun di balik antarmuka `TransactionParser`.
+  Implementasi awal `RuleBasedParser` bersifat deterministik & offline (tanpa
+  dependency/LLM). Adapter berbasis LLM (provider TBD) akan mengimplementasikan
+  antarmuka yang sama tanpa mengubah pipeline.
+- **Alasan:** Provider LLM masih Open Question & tak ada API key; rule-based dapat
+  diuji deterministik, menjadi fallback, dan menegakkan boundary arsitektur.
+- **Status:** aktif (adapter LLM menyusul setelah provider dipilih).
+
+## 2026-09-12 — Boundary: output parser tidak pernah langsung ke DB
+- **Keputusan:** Pipeline menegakkan `parse → schema validation → business
+  validation → Financial Engine`. Parser hanya menghasilkan `Draft`; penyimpanan
+  hanya lewat `commit(draft)` eksplisit untuk draft berstatus READY. Draft
+  INCOMPLETE/AMBIGUOUS/NOT_TRANSACTION tidak bisa di-commit. Duplikat ditandai
+  (bukan diblokir); `commit(allow_duplicate=False)` menolak sampai dikonfirmasi.
+- **Alasan:** Konsisten dengan prinsip "draft dulu" & memisahkan AI probabilistik
+  dari Financial Engine deterministik.
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->
