@@ -116,7 +116,7 @@
     <div class="capture-inner">
       <input id="textInput" placeholder="Ketik atau tekan mic — mis. 'Beli kopi 35 ribu pakai BCA'"
              onkeydown="if(event.key==='Enter')startParse(this.value)"/>
-      <button class="mic" title="Rekam suara" onclick="simulateVoice()">🎤</button>
+      <button class="mic" title="Rekam suara" onclick="startVoice()">🎤</button>
     </div>
   </div>
 
@@ -163,11 +163,44 @@ function mockParse(text){
 const rp=n=>'Rp'+ (n||0).toLocaleString('id-ID');
 
 let draft=null;
-function simulateVoice(){
-  const samples=['Beli kopi 35 ribu pakai BCA','Bensin 50 ribu','Makan siang 40 ribu pakai Mandiri','Beli sesuatu 20 ribu'];
-  const s=samples[Math.floor(Math.random()*samples.length)];
-  document.getElementById('textInput').value=s;
-  startParse(s);
+let recognition=null;
+// Voice: STT browser (Web Speech API, id-ID) -> teks -> pipeline yang sama.
+function startVoice(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ // fallback: browser tak mendukung STT
+    toastMsg('Voice tidak didukung di sini — silakan ketik.');
+    document.getElementById('textInput').focus();
+    return;
+  }
+  try{
+    recognition = new SR();
+    recognition.lang='id-ID';
+    recognition.interimResults=false;
+    recognition.maxAlternatives=1;
+    setMic(true);
+    recognition.onresult=(e)=>{
+      const transcript=e.results[0][0].transcript;
+      document.getElementById('textInput').value=transcript;
+      setMic(false);
+      startParse(transcript); // konvergensi ke jalur teks — hasil sama
+    };
+    recognition.onerror=(e)=>{ // fallback bila STT gagal
+      setMic(false);
+      toastMsg('Tidak bisa mendengar — ketik manual.');
+      document.getElementById('textInput').focus();
+    };
+    recognition.onend=()=>setMic(false);
+    recognition.start();
+  }catch(err){
+    setMic(false);
+    toastMsg('Voice gagal dimulai — ketik manual.');
+    document.getElementById('textInput').focus();
+  }
+}
+function setMic(listening){
+  const m=document.querySelector('.mic');
+  m.textContent = listening ? '⏹️' : '🎤';
+  m.style.background = listening ? '#b91c1c' : '';
 }
 function startParse(text){
   if(!text||!text.trim())return;
@@ -218,7 +251,8 @@ function save(){
 }
 function openSheet(){document.getElementById('scrim').classList.add('show');document.getElementById('sheet').classList.add('show');}
 function closeSheet(){document.getElementById('scrim').classList.remove('show');document.getElementById('sheet').classList.remove('show');document.getElementById('textInput').value='';}
-function toast(){const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600);}
+function toast(){toastMsg('Tercatat ✓');}
+function toastMsg(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800);}
 </script>
 </body>
 </html>

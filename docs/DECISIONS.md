@@ -127,6 +127,23 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   dari Financial Engine deterministik.
 - **Status:** aktif.
 
+## 2026-09-12 — Voice konvergen ke teks & memakai pipeline yang sama
+- **Keputusan:** Voice input = STT → teks → `ParsePipeline` yang identik dengan
+  text input. STT di balik antarmuka `SpeechToText` (fake untuk test; browser Web
+  Speech API di prototipe; provider nyata menyusul). Tidak ada logika parsing
+  khusus voice, sehingga hasil suara = hasil mengetik kalimat yang sama.
+- **Alasan:** Menjamin parity voice=teks, menghindari duplikasi logika, hemat
+  pemeliharaan. Financial Engine tidak diubah.
+- **Status:** aktif.
+
+## 2026-09-12 — Fallback voice: selalu ada jalur teks manual
+- **Keputusan:** Bila STT gagal/kosong/error → `VoiceResult(fallback=True)` dan UX
+  mengarahkan ke input teks manual. STT low-confidence tetap di-parse namun
+  ditandai untuk direview/diedit sebelum simpan.
+- **Alasan:** Prioritas error handling & UX sederhana; suara tidak boleh menjadi
+  jalan buntu.
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->

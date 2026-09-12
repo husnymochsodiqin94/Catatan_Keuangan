@@ -3,9 +3,9 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 6 — AI Transaction Parser (rule-based) selesai & teruji.** Belum ada API/UI/voice/LLM nyata.
+**Tahap 7 — Voice input selesai & teruji.** Belum ada API server/DB/LLM & STT provider nyata.
 
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **41 test OK**.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **47 test OK**.
 
 ## Sudah Dikerjakan
 - [x] Inisialisasi repository git (branch `claude/financial-assistant-setup-n1aqkd`).
@@ -24,12 +24,14 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] **Test** (`tests/test_financial_engine.py`): income, expense, transfer, refund, balance, multiple accounts, credit card (anti double-counting), duplikat, validasi. 24 test OK.
 - [x] **AI Transaction Parser** (`nlp/`): schema `ParsedTransaction` + `validate_schema`; antarmuka `TransactionParser` + `RuleBasedParser` (deterministik, id-ID); `ParsePipeline` (parse → schema → business validation → siap ke Financial Engine, tanpa persistensi; `commit()` eksplisit, `apply_correction()`).
 - [x] **Test** (`tests/test_nlp_parser.py`): expense, income, transfer, multiple, natural date, nominal Indonesia, missing account, ambiguous/bukan-transaksi, correction, duplicate. 17 test OK.
+- [x] **Voice input** (`voice/`): antarmuka `SpeechToText` + `FakeSpeechToText`; `VoiceInputHandler` (STT → `ParsePipeline` yang sama dengan teks → drafts; fallback bila STT gagal/kosong/error; low-confidence minta review). Prototipe (`docs/prototype/index.html`) memakai Web Speech API (id-ID) dengan fallback ke ketik manual.
+- [x] **Test** (`tests/test_voice_input.py`): parity voice=teks ("Beli makan siang 50 ribu pakai BCA"), tidak auto-simpan, STT gagal/kosong/exception → fallback, low-confidence → review. 6 test OK.
 
 ## Belum Dikerjakan
 - [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database, UX) — blocker sebelum lapisan lain.
-- [ ] **Adapter LLM nyata**: `RuleBasedParser` adalah implementasi/fallback offline; adapter LLM (provider TBD) tinggal mengimplementasikan `TransactionParser`. Menunggu keputusan provider.
+- [ ] **Adapter nyata**: `RuleBasedParser` (parser) & `SpeechToText` (voice) masih pakai implementasi rule-based/fake; adapter LLM & STT provider nyata tinggal mengimplementasikan antarmuka yang sama. Menunggu keputusan provider.
 - [ ] Adjustment: efek sudah didukung di engine (untuk balance), belum ada `create_adjustment` publik.
-- [ ] Lapisan berikutnya (belum diminta): persistence/DB, endpoint API, voice, UI.
+- [ ] Lapisan berikutnya (belum diminta): persistence/DB, endpoint API, UI penuh.
 
 ## Catatan Konsistensi Aturan (perlu perhatian, tidak memblokir)
 - `FINANCIAL_RULES.md` #3 menaruh "refund ke credit card" pada kolom `from_account_id`,
