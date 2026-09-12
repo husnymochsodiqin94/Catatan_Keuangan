@@ -15,6 +15,7 @@ python3 -m server.app          # buka http://127.0.0.1:8000
 python3 -m unittest discover -s tests -t .   # jalankan test (78 test)
 ```
 Deploy & konfigurasi (auth token, email SMTP): `docs/DEPLOY.md`.
+Deploy GRATIS langkah-demi-langkah (Oracle Cloud + DuckDNS): `docs/DEPLOY_ORACLE.md`.
 - Backend: `server/` — HTTP stdlib + SQLite, membungkus `financial_engine`/`nlp`/`reporting`.
 - Frontend PWA: `webapp/` — disajikan oleh backend di origin yang sama.
 - Data tersimpan di `data.db` (SQLite, tidak di-commit).

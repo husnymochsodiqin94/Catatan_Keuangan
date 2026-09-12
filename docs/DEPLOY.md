@@ -27,6 +27,10 @@ Alert email hanya terkirim bila `SMTP_HOST` **dan** `SMTP_FROM` diset **dan** em
 tujuan diisi di Pengaturan. Tanpa itu, alert tetap tampil in-app (banner) — endpoint
 `POST /api/alerts/send` mengembalikan alasannya.
 
+> **Mau gratis?** Panduan lengkap gratis (Oracle Cloud Always Free + DuckDNS),
+> klik-demi-klik: **`docs/DEPLOY_ORACLE.md`**. Jalur di bawah ini generik untuk
+> server/domain apa pun.
+
 ## Deploy A — Docker + Caddy (HTTPS otomatis) — disarankan
 Butuh: server dengan Docker + domain yang mengarah ke IP server (A record).
 
