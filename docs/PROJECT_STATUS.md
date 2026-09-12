@@ -3,7 +3,7 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Fase 0 — Inisialisasi & dokumentasi.** Belum ada kode aplikasi.
+**Tahap 1 — Product Discovery selesai.** Belum ada kode aplikasi.
 
 ## Sudah Dikerjakan
 - [x] Inisialisasi repository git (branch `claude/financial-assistant-setup-n1aqkd`).
@@ -12,8 +12,11 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] `docs/PRODUCT_VISION.md` — visi & lingkup produk.
 - [x] `docs/DECISIONS.md` — catatan keputusan.
 - [x] `docs/PROJECT_STATUS.md` — file ini.
+- [x] `docs/PRODUCT_REQUIREMENTS.md` — definisi produk (Tahap 1: problem, persona, JTBD, flow, requirement, MVP/Phase, metrik, risiko, edge cases, open questions).
 
 ## Belum Dikerjakan
+- [ ] **Jawab OPEN PRODUCT QUESTIONS** di `docs/PRODUCT_REQUIREMENTS.md` (blocker sebelum arsitektur).
+- [ ] Tahap berikutnya: desain arsitektur.
 - [ ] Pemilihan stack teknologi (bahasa/framework).
 - [ ] Desain model data transaksi.
 - [ ] Pemilihan penyedia model AI untuk ekstraksi entitas.
