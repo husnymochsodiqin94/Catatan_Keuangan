@@ -40,6 +40,27 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
 - **Alasan:** Keputusan produk mendahului keputusan arsitektur; hindari asumsi besar.
 - **Status:** aktif — menunggu keputusan pengguna.
 
+## 2026-09-12 — Basis akrual & anti double-counting kartu kredit
+- **Keputusan:** Expense diakui saat transaksi terjadi (basis akrual), terlepas
+  dari metode bayar. Belanja pakai CC = expense + utang bertambah; **pembayaran
+  tagihan CC = transfer/pelunasan liability, BUKAN expense**.
+- **Alasan:** Mencegah double counting (peristiwa dihitung sekali) dan sesuai
+  model mental pengguna.
+- **Status:** aktif.
+
+## 2026-09-12 — Klasifikasi akun: asset vs liability
+- **Keputusan:** Cash, Bank, E-wallet = asset (saldo = uang dimiliki);
+  Credit Card = liability (saldo = utang terutang). Net Worth = ΣAsset − ΣLiability.
+- **Alasan:** Fondasi konsisten untuk balance, cash flow, dan net worth.
+- **Status:** aktif.
+
+## 2026-09-12 — Transaksi = sumber kebenaran, saldo = turunan
+- **Keputusan:** Saldo dihitung/di-cache dari daftar transaksi, bukan disimpan
+  sebagai satu-satunya sumber. Refund = contra-expense (bukan income). Transfer
+  & pembayaran CC netral terhadap net worth & net cash flow.
+- **Alasan:** Menjamin konsistensi saat edit/hapus dan menghindari saldo "kotor".
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->
