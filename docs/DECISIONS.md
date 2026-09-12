@@ -89,6 +89,25 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
 - **Alasan:** Jangan buat entity sebelum diperlukan; jaga audit & konsistensi saldo turunan.
 - **Status:** aktif.
 
+## 2026-09-12 — Financial Engine diimplementasikan dengan Python, tanpa dependency
+- **Keputusan:** Financial Engine (modul inti) ditulis dalam **Python 3** memakai
+  **stdlib saja** (`dataclasses`, `enum`, `unittest`) — nol dependency pihak ketiga.
+- **Alasan:** Modul murni/terisolasi & portabel; Python/FastAPI adalah opsi backend
+  yang sudah tercatat; nol dependency = sesuai prinsip anti-over-engineering & bisa
+  langsung diuji tanpa `npm install`/jaringan. Keputusan stack backend penuh (mis.
+  bila memilih TypeScript) masih terbuka; engine mudah diport bila perlu.
+- **Status:** aktif (dapat ditinjau ulang saat stack final ditetapkan).
+
+## 2026-09-12 — Refund selalu dimodelkan via to_account_id
+- **Keputusan:** Semua refund (ke asset maupun credit card) direkam dengan
+  `to_account_id = akun tujuan` dan diperlakukan sebagai "uang kembali" — pada asset
+  menambah saldo, pada CC menurunkan utang. Ini menyelaraskan implementasi dengan
+  **efek** yang dinyatakan FINANCIAL_RULES #11 (refund pada CC → utang turun).
+- **Alasan:** Menghindari inkonsistensi representasi kolom di FINANCIAL_RULES #3
+  (yang menaruh refund-CC di `from_account_id`). Outcome finansial tidak berubah.
+- **Tindak lanjut:** selaraskan tabel #3 di FINANCIAL_RULES pada revisi berikutnya.
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->

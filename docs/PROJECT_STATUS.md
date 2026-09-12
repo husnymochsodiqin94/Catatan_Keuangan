@@ -3,7 +3,9 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 4 — UX/UI MVP selesai.** Belum ada kode aplikasi (hanya prototipe UX statis).
+**Tahap 5 — Financial Engine (core) selesai & teruji.** Baru modul inti; belum ada API/UI/AI.
+
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **24 test OK**.
 
 ## Sudah Dikerjakan
 - [x] Inisialisasi repository git (branch `claude/financial-assistant-setup-n1aqkd`).
@@ -18,10 +20,20 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] `docs/DATABASE_DESIGN.md` — desain DB MVP (Tahap 3: evaluasi entity, ERD, field/PK/FK/index/constraint, pemetaan tipe transaksi ke from/to, deletion & audit).
 - [x] `docs/UX_UI_MVP.md` — desain UX MVP (Tahap 4: IA, screen hierarchy, user flow, komponen, UI states, spesifikasi layar, microcopy).
 - [x] `docs/prototype/index.html` — prototipe UX statis alur inti Capture→Preview→Simpan (parser tiruan, tanpa backend/AI).
+- [x] **Financial Engine** (`financial_engine/`): create income/expense/transfer/refund, balance, cash flow, net worth, validasi transaksi, deteksi duplikat. Python, tanpa dependency.
+- [x] **Test** (`tests/test_financial_engine.py`): income, expense, transfer, refund, balance, multiple accounts, credit card (anti double-counting), duplikat, validasi. 24 test OK.
 
 ## Belum Dikerjakan
-- [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database, UX) — blocker sebelum implementasi.
-- [ ] Tahap berikutnya: rencana implementasi / scaffolding kode (menunggu instruksi & keputusan stack).
+- [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database, UX) — blocker sebelum lapisan lain.
+- [ ] Adjustment: efek sudah didukung di engine (untuk balance), tetapi belum ada `create_adjustment` publik (di luar lingkup task ini).
+- [ ] Lapisan berikutnya (belum diminta): persistence/DB, validation layer API, AI adapter, voice, UI.
+
+## Catatan Konsistensi Aturan (perlu perhatian, tidak memblokir)
+- `FINANCIAL_RULES.md` #3 menaruh "refund ke credit card" pada kolom `from_account_id`,
+  sedangkan formula #11 menyatakan efeknya **menurunkan utang** (−amount). Engine
+  mengikuti **efek** yang benar (utang turun) dengan memodelkan refund selalu via
+  `to_account_id`. Outcome tidak berubah; hanya representasi kolom di #3 yang perlu
+  diselaraskan agar konsisten dengan #11.
 - [ ] Pemilihan stack teknologi (bahasa/framework).
 - [ ] Desain model data transaksi.
 - [ ] Pemilihan penyedia model AI untuk ekstraksi entitas.
