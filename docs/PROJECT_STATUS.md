@@ -13,7 +13,7 @@ _Terakhir diperbarui: 2026-09-12_
 ## Roadmap Fitur (dari masukan user, 2026-09-12)
 - **Sudah ada di engine (tinggal disambungkan ke UI):** transfer antar akun, e-wallet, kartu kredit/liabilitas (utang dasar).
 - **Prioritas Phase 2 (butuh engine + DB):** Budgeting per kategori + notifikasi 80–100% (prioritas tertinggi), **batas pengeluaran & target pemasukan per periode (harian/mingguan/bulanan) + ambang alert 90%**, recurring/upcoming bills otomatis, tren MoM, filter periode custom, export CSV/Excel/PDF, utang/piutang eksplisit.
-- **Alert WhatsApp (Phase 2, integrasi eksternal):** butuh backend + provider (WhatsApp Business Cloud API/Meta atau Twilio) + template pesan + verifikasi nomor + pemicu. Notifikasi in-app bisa lebih dulu (lebih murah). Logika ambang = deterministik di engine.
+- **Alert channel (Phase 2):** **Email dulu** (butuh penyedia SMTP/email spt SES/SendGrid/Resend — relatif sederhana) + notifikasi in-app. **WhatsApp ditunda** (butuh WhatsApp Business Cloud API/Meta atau Twilio + template + verifikasi nomor). Logika ambang = deterministik di engine; pemicu saat transaksi disimpan / cek terjadwal.
 - **Phase 3:** Multi-currency.
 - Elemen di atas sudah ditampilkan sebagai **mockup** (belum berfungsi) untuk memvalidasi arah UI.
 

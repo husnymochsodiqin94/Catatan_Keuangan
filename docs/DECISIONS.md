@@ -172,6 +172,14 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   over-engineering di MVP.
 - **Status:** aktif (ditampilkan sebagai mockup, implementasi menyusul).
 
+## 2026-09-12 — Channel alert: Email dulu, WhatsApp ditunda
+- **Keputusan:** Channel pengiriman alert untuk saat ini = **Email** (+ notifikasi
+  in-app). **WhatsApp ditunda** (tetap di roadmap, ditandai "Segera · Phase 2").
+- **Alasan:** Email jauh lebih sederhana — cukup penyedia SMTP/email (mis.
+  Amazon SES / SendGrid / Resend), tanpa template approval Meta atau verifikasi
+  nomor bisnis. Tetap butuh backend untuk mengirim, tetapi hambatannya kecil.
+- **Status:** aktif (UI mockup sudah email-first; implementasi menyusul saat backend ada).
+
 ## 2026-09-12 — Target/Batas per periode + alert; WhatsApp butuh backend (Phase 2)
 - **Keputusan:** Fitur set **batas pengeluaran** & **target pemasukan** per
   Harian/Mingguan/Bulanan + **ambang alert** (default 90%). Logika ambang =
