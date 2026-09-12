@@ -1,0 +1,6 @@
+# Caddy: HTTPS otomatis (Let's Encrypt) untuk domain nyata; self-signed untuk localhost.
+# DOMAIN diisi dari .env (mis. keuangan.contoh.com).
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8000
+}

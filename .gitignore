@@ -27,3 +27,8 @@ __pycache__/
 # Local DB
 *.db
 data.db
+
+# Secrets
+.env
+.env.*
+!.env.example

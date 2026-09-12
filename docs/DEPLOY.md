@@ -27,16 +27,45 @@ Alert email hanya terkirim bila `SMTP_HOST` **dan** `SMTP_FROM` diset **dan** em
 tujuan diisi di Pengaturan. Tanpa itu, alert tetap tampil in-app (banner) — endpoint
 `POST /api/alerts/send` mengembalikan alasannya.
 
-## Deploy (garis besar)
-Karena hanya butuh Python, deploy sederhana:
-1. **VPS / container:** jalankan `HOST=0.0.0.0 PORT=8000 CATATAN_TOKEN=<rahasia> python3 -m server.app` di belakang reverse proxy (Nginx/Caddy) dengan **HTTPS** (wajib agar Web Speech/mic & PWA install aktif).
-2. **Auth:** set `CATATAN_TOKEN`. Klien memasukkan token sekali (disimpan di browser) — pertama kali API menolak (401), aplikasi meminta token.
-3. **Email:** set variabel `SMTP_*` (mis. Amazon SES/SendGrid/Resend SMTP).
-4. **Backup:** cukup salin file `data.db`.
+## Deploy A — Docker + Caddy (HTTPS otomatis) — disarankan
+Butuh: server dengan Docker + domain yang mengarah ke IP server (A record).
 
-Untuk mengirim alert email otomatis saat mendekati batas, panggil
-`POST /api/alerts/send` secara terjadwal (mis. cron harian) atau tambahkan pemicu
-saat transaksi disimpan (menyusul).
+```bash
+git clone <repo> && cd Catatan_Keuangan
+cp .env.example .env
+# edit .env: isi DOMAIN (mis. keuangan.contoh.com) & CATATAN_TOKEN
+#   token acak:  python3 -c "import secrets;print(secrets.token_urlsafe(32))"
+docker compose up -d --build
+```
+- Caddy otomatis menerbitkan sertifikat HTTPS (Let's Encrypt) untuk `DOMAIN`.
+- App di-`expose` internal (port 8000), hanya Caddy yang membuka 80/443.
+- Data tersimpan di volume `catatan-data` (SQLite `/data/data.db`).
+- Cek: `docker compose logs -f`, health: `https://DOMAIN/api/health`.
+- Update: `git pull && docker compose up -d --build`.
+- Uji lokal tanpa domain: biarkan `DOMAIN=localhost` → Caddy pakai sertifikat
+  self-signed (browser akan memperingatkan; wajar untuk uji).
+
+File terkait: `Dockerfile`, `docker-compose.yml`, `deploy/Caddyfile`, `.env`.
+
+## Deploy B — VPS tanpa Docker (systemd + reverse proxy)
+```bash
+sudo useradd -r -s /usr/sbin/nologin catatan
+sudo mkdir -p /opt/catatan && sudo cp -r . /opt/catatan && sudo chown -R catatan /opt/catatan
+sudo cp deploy/catatan.service /etc/systemd/system/
+# edit unit: set CATATAN_TOKEN (dan SMTP_* bila pakai email)
+sudo systemctl daemon-reload && sudo systemctl enable --now catatan
+```
+Lalu pasang **Caddy/Nginx** di depan dengan HTTPS, reverse-proxy ke
+`127.0.0.1:8000`. Contoh Caddyfile satu baris: `keuangan.contoh.com { reverse_proxy 127.0.0.1:8000 }`.
+
+## Setelah online
+- **Auth:** karena `CATATAN_TOKEN` diset, saat pertama kali API menolak (401)
+  aplikasi meminta token; token disimpan di browser.
+- **Email otomatis:** jadwalkan `POST /api/alerts/send` (dengan header `X-Token`)
+  via cron, mis. harian:
+  `0 20 * * *  curl -s -X POST -H "X-Token: $TOKEN" https://DOMAIN/api/alerts/send`
+- **Backup:** salin volume/`data.db` secara berkala.
+- **HTTPS wajib**: mikrofon (Web Speech) & pemasangan PWA hanya aktif di HTTPS.
 
 ## Catatan
 - MVP single-user; token bersifat bersama (bukan multi-akun). Multi-user + login

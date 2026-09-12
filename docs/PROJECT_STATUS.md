@@ -44,6 +44,7 @@ Berfungsi: capture (suara/teks) → parse → konfirmasi → simpan; dashboard; 
 - [x] **Budgeting** (`financial_engine/budgeting.py`): batas pengeluaran & target pemasukan per periode (harian/mingguan/bulanan), anggaran per kategori, evaluasi ambang & daftar alert (deterministik). Test `tests/test_budgeting.py` (7 OK).
 - [x] **Alert email** (`server/email_alert.py`): pengiriman via SMTP (stdlib), aktif bila dikonfigurasi (`SMTP_*`); jika tidak, alert in-app.
 - [x] **Auth opsional** (`CATATAN_TOKEN`) & **panduan deploy** (`docs/DEPLOY.md`).
+- [x] **Artefak deploy**: `Dockerfile` (python:3.11-slim, healthcheck), `docker-compose.yml` (app + Caddy HTTPS otomatis), `deploy/Caddyfile`, `deploy/catatan.service` (systemd), `.env.example`, `.dockerignore`. Diverifikasi berjalan dari salinan berisi hanya paket app (setara isi container).
 - [x] **Audit MVP** (`docs/AUDIT_REPORT.md`): financial accuracy, AI, security, performance, token/AI-cost. Defect diperbaiki: A1 splitter "hari lalu", A2 angka frasa waktu jadi nominal, P1 repeated processing di `net_worth`. Regresi `TestTemporalNotAmount` ditambahkan.
 
 ## Temuan Audit Terbuka (belum dikerjakan — bukan defect diam-diam)

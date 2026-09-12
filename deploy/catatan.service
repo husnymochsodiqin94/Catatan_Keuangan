@@ -1,0 +1,29 @@
+# systemd unit untuk deploy tanpa Docker (VPS).
+# Pasang: salin repo ke /opt/catatan, buat user 'catatan', lalu:
+#   sudo cp deploy/catatan.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now catatan
+# Taruh HTTPS di depan (Caddy/Nginx) yang reverse-proxy ke 127.0.0.1:8000.
+[Unit]
+Description=AI Financial Assistant
+After=network.target
+
+[Service]
+Type=simple
+User=catatan
+WorkingDirectory=/opt/catatan
+Environment=HOST=127.0.0.1
+Environment=PORT=8000
+Environment=CATATAN_DB=/opt/catatan/data.db
+# Wajib saat online — isi token acak:
+# Environment=CATATAN_TOKEN=ganti-token-acak
+# Email alert (opsional):
+# Environment=SMTP_HOST=
+# Environment=SMTP_FROM=
+ExecStart=/usr/bin/python3 -m server.app
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

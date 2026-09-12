@@ -229,6 +229,14 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   aman; hindari dependency & kredensial wajib di MVP.
 - **Status:** aktif (WhatsApp tetap ditunda; multi-user/login proper menyusul).
 
+## 2026-09-12 — Deploy: Docker + Caddy (HTTPS otomatis), opsi systemd
+- **Keputusan:** Jalur deploy utama = `docker compose` (image python:3.11-slim
+  menjalankan server stdlib) di belakang **Caddy** untuk HTTPS otomatis; alternatif
+  **systemd** untuk VPS tanpa Docker. Rahasia lewat `.env` (tidak di-commit).
+- **Alasan:** HTTPS wajib (mic/PWA), Caddy paling sederhana untuk sertifikat
+  otomatis; tetap tanpa dependency aplikasi (image hanya menjalankan stdlib).
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->
