@@ -208,16 +208,30 @@ class FinancialEngine:
             total += self._effects(tx).get(account_id, 0)
         return total
 
+    def _all_balances(self) -> Dict[str, int]:
+        """Saldo semua akun dalam SATU kali pindai transaksi (hindari rescan per-akun)."""
+        totals = {aid: acc.starting_balance for aid, acc in self._accounts.items()}
+        for tx in self._transactions:
+            if tx.deleted:
+                continue
+            for aid, delta in self._effects(tx).items():
+                totals[aid] = totals.get(aid, 0) + delta
+        return totals
+
     def total_assets(self) -> int:
-        return sum(self.balance(a.id) for a in self._accounts.values() if a.type.is_asset)
+        balances = self._all_balances()
+        return sum(balances[a.id] for a in self._accounts.values() if a.type.is_asset)
 
     def total_liabilities(self) -> int:
-        return sum(
-            self.balance(a.id) for a in self._accounts.values() if a.type.is_liability
-        )
+        balances = self._all_balances()
+        return sum(balances[a.id] for a in self._accounts.values() if a.type.is_liability)
 
     def net_worth(self) -> int:
-        return self.total_assets() - self.total_liabilities()
+        balances = self._all_balances()
+        worth = 0
+        for a in self._accounts.values():
+            worth += balances[a.id] if a.type.is_asset else -balances[a.id]
+        return worth
 
     def cash_flow(
         self, start: Optional[datetime] = None, end: Optional[datetime] = None

@@ -3,9 +3,9 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 8 — UI Dashboard & Transaction History selesai & teruji.** Belum ada API server/DB/LLM & STT provider nyata.
+**Tahap 9 — Audit MVP selesai; defect diperbaiki.** Belum ada API server/DB/LLM & STT provider nyata.
 
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **56 test OK**.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **59 test OK**.
 **Regenerate dashboard demo:** `python3 -m reporting.render_demo` → `docs/prototype/dashboard.html`.
 
 ## Sudah Dikerjakan
@@ -29,6 +29,11 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] **Test** (`tests/test_voice_input.py`): parity voice=teks ("Beli makan siang 50 ribu pakai BCA"), tidak auto-simpan, STT gagal/kosong/exception → fallback, low-confidence → review. 6 test OK.
 - [x] **Reporting/UI** (`reporting/`, `financial_engine` +method): Dashboard (total balance, income/expense/net cash flow bulan ini, expense per kategori, recent) & Transaction History (list, filter, search, edit, delete) — **semua angka dari Financial Engine** (`month_summary`, `expense_by_category`, `query_transactions`, `recent_transactions`, `edit_transaction`). Renderer HTML hanya menampilkan data (`docs/prototype/dashboard.html`) + loading/empty/error state.
 - [x] **Test** (`tests/test_reporting.py`): angka dashboard = engine, expense-per-kategori neto & terurut, recent, filter/search/account, edit & delete memengaruhi saldo/dashboard. 9 test OK.
+- [x] **Audit MVP** (`docs/AUDIT_REPORT.md`): financial accuracy, AI, security, performance, token/AI-cost. Defect diperbaiki: A1 splitter "hari lalu", A2 angka frasa waktu jadi nominal, P1 repeated processing di `net_worth`. Regresi `TestTemporalNotAmount` ditambahkan.
+
+## Temuan Audit Terbuka (belum dikerjakan — bukan defect diam-diam)
+- [ ] **A3** — Intent "bayar kartu kredit ... dari BCA" belum dikenali sebagai transfer bank→CC (potensi double counting bila di-commit tanpa koreksi). Mitigasi: konfirmasi/koreksi draft. Perbaikan = fitur baru (butuh resolusi akun CC).
+- [ ] **SEC** — Auth, authorization, user isolation, API keys, DB access wajib diimplementasikan **sebelum** lapisan API/DB (saat ini belum ada attack surface).
 
 ## Belum Dikerjakan
 - [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database, UX) — blocker sebelum lapisan lain.

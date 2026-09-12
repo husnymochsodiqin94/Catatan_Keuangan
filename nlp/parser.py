@@ -49,7 +49,8 @@ EXPENSE_VERBS = ("beli", "bayar", "belanja", "jajan", "keluar")
 TRANSFER_KEYWORDS = ("transfer", "pindah", "kirim", "top up", "topup", "tf")
 REFUND_KEYWORDS = ("refund", "pengembalian", "dikembalikan", "retur")
 
-SPLIT_RE = re.compile(r"\s*(?:,|;|\bdan\b|\blalu\b|\bkemudian\b|\bterus\b)\s+")
+# Pemisah multi-transaksi. "lalu" dikecualikan bila bagian dari "hari lalu" (frasa tanggal).
+SPLIT_RE = re.compile(r"\s*(?:,|;|\bdan\b|\bkemudian\b|\bterus\b|(?<!hari )\blalu\b)\s+")
 
 
 class RuleBasedParser:
@@ -133,7 +134,15 @@ class RuleBasedParser:
     # ------------------------------------------------------------------ #
     # Nominal Indonesia
     # ------------------------------------------------------------------ #
+    # frasa waktu yang mengandung angka -> jangan dianggap nominal
+    _TEMPORAL_RE = re.compile(
+        r"\d+\s*hari\s*(?:yang\s*)?lalu|kemarin\s*lusa|kemarin|besok|"
+        r"(?:jam|pukul)\s*\d{1,2}(?:[.:]\d{2})?"
+    )
+
     def _parse_amount(self, low: str) -> Optional[int]:
+        # buang token waktu dulu agar angka tanggal/jam tak salah jadi nominal
+        low = self._TEMPORAL_RE.sub(" ", low)
         m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:juta|jt)\b", low)
         if m:
             return int(round(self._to_float(m.group(1)) * 1_000_000))

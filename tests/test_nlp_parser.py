@@ -112,6 +112,27 @@ class TestIndonesianNominal(BaseCase):
                 self.assertEqual(d.parsed.amount, expected)
 
 
+class TestTemporalNotAmount(BaseCase):
+    """Regresi audit: angka pada frasa waktu tidak boleh dibaca sebagai nominal."""
+
+    def test_n_hari_lalu_bukan_nominal(self):
+        now = datetime(2026, 9, 12, 10, 0, 0)
+        d = self.pipe.process("makan 3 hari lalu pakai BCA", now=now)[0]
+        self.assertIsNone(d.parsed.amount)  # "3" bukan nominal
+        self.assertEqual(d.parsed.date, date(2026, 9, 9))
+        self.assertIn("amount", d.missing)
+
+    def test_jam_bukan_nominal(self):
+        d = self.pipe.process("beli kopi jam 9 pakai BCA")[0]
+        self.assertIsNone(d.parsed.amount)
+
+    def test_nominal_tetap_terbaca_dengan_frasa_waktu(self):
+        now = datetime(2026, 9, 12, 10, 0, 0)
+        d = self.pipe.process("bayar listrik 100 ribu pakai BCA 3 hari lalu", now=now)[0]
+        self.assertEqual(d.parsed.amount, 100_000)
+        self.assertEqual(d.parsed.date, date(2026, 9, 9))
+
+
 class TestMissingAccount(BaseCase):
     def test_missing_account(self):
         d = self.pipe.process("beli kopi 35 ribu")[0]
