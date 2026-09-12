@@ -155,6 +155,23 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   dengan "transaksi = sumber kebenaran, saldo = turunan".
 - **Status:** aktif.
 
+## 2026-09-12 — Platform: PWA (mobile + web + laptop), mockup dulu
+- **Keputusan:** Aplikasi dibangun sebagai **PWA** (satu basis kode React untuk
+  HP, web, dan laptop), sesuai rekomendasi arsitektur. Tahap desain dimulai
+  dengan mockup (design canvas) sebelum coding.
+- **Alasan:** Memenuhi "mobile + web + laptop" dengan satu basis kode, hemat, bisa
+  masuk Play Store belakangan via TWA.
+- **Status:** aktif.
+
+## 2026-09-12 — Prioritas fitur pasca-MVP (masukan user)
+- **Keputusan:** Budgeting per kategori (+notifikasi 80–100%) dijadikan
+  prioritas Phase 2 tertinggi; menyusul recurring/upcoming bills, tren MoM,
+  filter periode custom, export data, utang/piutang eksplisit. Multi-currency
+  = Phase 3. Transfer/e-wallet/liabilitas sudah ada di engine.
+- **Alasan:** Fitur yang paling dicari pengguna; tetap dijaga bertahap agar tidak
+  over-engineering di MVP.
+- **Status:** aktif (ditampilkan sebagai mockup, implementasi menyusul).
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->
