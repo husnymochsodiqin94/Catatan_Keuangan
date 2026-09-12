@@ -5,7 +5,7 @@ _Terakhir diperbarui: 2026-09-12_
 ## Fase Saat Ini
 **Tahap 10 — Mockup UI (design canvas) untuk PWA.** Keputusan platform: **PWA** (mobile + web + laptop, satu basis kode). Belum ada aplikasi/API/DB nyata.
 
-**Mockup (design canvas, Versi 4):** 9 artboard — Home, Capture, Konfirmasi, Riwayat, Anggaran per kategori, **Akun (aset/liabilitas/utang-piutang)**, **Statistik (donat + tren)**, **Target & Batas + Alert WhatsApp**, dan tampilan Web/Laptop. (File kerja di scratchpad sesi; canvas tersimpan sebagai Artifact.)
+**Mockup (design canvas, Versi 6):** 10 artboard — Home (+banner alert in-app), **Empty/Onboarding**, Capture, Konfirmasi, Riwayat, Anggaran per kategori, Akun (aset/liabilitas/utang-piutang), Statistik (donat + tren), Target & Batas + Alert (Email; WhatsApp menyusul), dan tampilan Web/Laptop. (File kerja di scratchpad sesi; canvas tersimpan sebagai Artifact.)
 
 **Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **59 test OK**.
 **Regenerate dashboard demo:** `python3 -m reporting.render_demo` → `docs/prototype/dashboard.html`.
