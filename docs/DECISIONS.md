@@ -61,6 +61,34 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
 - **Alasan:** Menjamin konsistensi saat edit/hapus dan menghindari saldo "kotor".
 - **Status:** aktif.
 
+## 2026-09-12 — Arsitektur MVP: modular monolith, bukan microservices
+- **Keputusan:** Satu backend (modular monolith) dengan modul terpisah: API,
+  Validation, AI Adapter, Financial Engine, Data Access. Frontend PWA, DB SQLite
+  (portabel ke Postgres). AI hanya di satu endpoint (`/nlp/parse`) di balik adapter.
+- **Alasan:** Paling sederhana untuk MVP single-user; hindari kompleksitas prematur.
+- **Status:** aktif.
+
+## 2026-09-12 — AI tidak menulis DB & terpisah dari Financial Engine
+- **Keputusan:** AI hanya menghasilkan draft terstruktur; penulisan hanya lewat
+  validasi + konfirmasi pengguna. Financial Engine bersifat deterministik & murni,
+  terpisah tegas dari AI.
+- **Alasan:** Menjaga kepercayaan, testability, dan mencegah efek non-deterministik pada data keuangan.
+- **Status:** aktif.
+
+## 2026-09-12 — Model data from/to & pembayaran CC sebagai transfer
+- **Keputusan:** Satu tabel `transactions` dengan `from_account_id`/`to_account_id`
+  melayani semua tipe. Pembayaran kartu kredit disimpan sebagai `transfer` (bank→CC)
+  sehingga otomatis bukan expense. Amount = integer rupiah > 0; arah dari tipe+peran akun.
+- **Alasan:** Menegakkan anti double-counting di level data & menyederhanakan skema.
+- **Status:** aktif.
+
+## 2026-09-12 — Entity MVP dibatasi & soft delete transaksi
+- **Keputusan:** MVP hanya `users, accounts, categories, transactions` (+ `ai_interactions`
+  minimal opsional). `merchants`, `user_preferences`, `recurring_transactions`,
+  `budgets` ditunda. Transaksi pakai soft delete; akun/kategori di-archive (RESTRICT hard delete).
+- **Alasan:** Jangan buat entity sebelum diperlukan; jaga audit & konsistensi saldo turunan.
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->
