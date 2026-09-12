@@ -5,14 +5,15 @@ _Terakhir diperbarui: 2026-09-12_
 ## Fase Saat Ini
 **Tahap 10 — Mockup UI (design canvas) untuk PWA.** Keputusan platform: **PWA** (mobile + web + laptop, satu basis kode). Belum ada aplikasi/API/DB nyata.
 
-**Mockup (design canvas, Versi 2):** 6 artboard — Home, Capture, Konfirmasi, Riwayat, **Anggaran per kategori**, dan tampilan Web/Laptop. Home memuat filter periode, indikator Anggaran + progress, tren MoM, tagihan mendatang, + Tambah Akun. (File kerja di scratchpad sesi; canvas tersimpan sebagai Artifact.)
+**Mockup (design canvas, Versi 4):** 9 artboard — Home, Capture, Konfirmasi, Riwayat, Anggaran per kategori, **Akun (aset/liabilitas/utang-piutang)**, **Statistik (donat + tren)**, **Target & Batas + Alert WhatsApp**, dan tampilan Web/Laptop. (File kerja di scratchpad sesi; canvas tersimpan sebagai Artifact.)
 
 **Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **59 test OK**.
 **Regenerate dashboard demo:** `python3 -m reporting.render_demo` → `docs/prototype/dashboard.html`.
 
 ## Roadmap Fitur (dari masukan user, 2026-09-12)
 - **Sudah ada di engine (tinggal disambungkan ke UI):** transfer antar akun, e-wallet, kartu kredit/liabilitas (utang dasar).
-- **Prioritas Phase 2 (butuh engine + DB):** Budgeting per kategori + notifikasi 80–100% (prioritas tertinggi), recurring/upcoming bills otomatis, tren MoM, filter periode custom, export CSV/Excel/PDF, utang/piutang eksplisit.
+- **Prioritas Phase 2 (butuh engine + DB):** Budgeting per kategori + notifikasi 80–100% (prioritas tertinggi), **batas pengeluaran & target pemasukan per periode (harian/mingguan/bulanan) + ambang alert 90%**, recurring/upcoming bills otomatis, tren MoM, filter periode custom, export CSV/Excel/PDF, utang/piutang eksplisit.
+- **Alert WhatsApp (Phase 2, integrasi eksternal):** butuh backend + provider (WhatsApp Business Cloud API/Meta atau Twilio) + template pesan + verifikasi nomor + pemicu. Notifikasi in-app bisa lebih dulu (lebih murah). Logika ambang = deterministik di engine.
 - **Phase 3:** Multi-currency.
 - Elemen di atas sudah ditampilkan sebagai **mockup** (belum berfungsi) untuk memvalidasi arah UI.
 

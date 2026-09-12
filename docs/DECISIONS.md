@@ -172,6 +172,18 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   over-engineering di MVP.
 - **Status:** aktif (ditampilkan sebagai mockup, implementasi menyusul).
 
+## 2026-09-12 — Target/Batas per periode + alert; WhatsApp butuh backend (Phase 2)
+- **Keputusan:** Fitur set **batas pengeluaran** & **target pemasukan** per
+  Harian/Mingguan/Bulanan + **ambang alert** (default 90%). Logika ambang =
+  deterministik di Financial Engine (bandingkan akumulasi periode vs batas).
+  Pengiriman **WhatsApp** memerlukan backend + provider (WhatsApp Business Cloud
+  API/Meta atau Twilio) + template pesan disetujui + verifikasi nomor + pemicu
+  (saat transaksi disimpan / cek terjadwal) → **Phase 2**, tidak berfungsi di
+  fase mockup. Channel alternatif: notifikasi in-app (paling murah, bisa lebih dulu).
+- **Alasan:** Pisahkan logika deterministik (murah, bisa diuji) dari integrasi
+  eksternal (butuh infra & kredensial); hindari over-promise di tahap mockup.
+- **Status:** aktif — UI sudah dimock (layar "Target & Batas"); implementasi menyusul.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->
