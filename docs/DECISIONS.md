@@ -144,6 +144,17 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   jalan buntu.
 - **Status:** aktif.
 
+## 2026-09-12 — Angka UI hanya dari Financial Engine (satu sumber kebenaran)
+- **Keputusan:** Agregasi dashboard (ringkasan bulan, expense per kategori) &
+  query history (filter/search/edit) berada di **financial layer** (method engine:
+  `month_summary`, `expense_by_category`, `query_transactions`,
+  `recent_transactions`, `edit_transaction`). Lapisan `reporting/` hanya memetakan
+  & memformat; renderer HTML hanya menampilkan data yang disematkan. Frontend
+  boleh memfilter/mencari baris (presentasi) tetapi TIDAK menghitung ulang angka finansial.
+- **Alasan:** Mencegah logika finansial ganda/menyimpang di frontend; konsisten
+  dengan "transaksi = sumber kebenaran, saldo = turunan".
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->

@@ -3,9 +3,10 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 7 — Voice input selesai & teruji.** Belum ada API server/DB/LLM & STT provider nyata.
+**Tahap 8 — UI Dashboard & Transaction History selesai & teruji.** Belum ada API server/DB/LLM & STT provider nyata.
 
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **47 test OK**.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **56 test OK**.
+**Regenerate dashboard demo:** `python3 -m reporting.render_demo` → `docs/prototype/dashboard.html`.
 
 ## Sudah Dikerjakan
 - [x] Inisialisasi repository git (branch `claude/financial-assistant-setup-n1aqkd`).
@@ -26,6 +27,8 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] **Test** (`tests/test_nlp_parser.py`): expense, income, transfer, multiple, natural date, nominal Indonesia, missing account, ambiguous/bukan-transaksi, correction, duplicate. 17 test OK.
 - [x] **Voice input** (`voice/`): antarmuka `SpeechToText` + `FakeSpeechToText`; `VoiceInputHandler` (STT → `ParsePipeline` yang sama dengan teks → drafts; fallback bila STT gagal/kosong/error; low-confidence minta review). Prototipe (`docs/prototype/index.html`) memakai Web Speech API (id-ID) dengan fallback ke ketik manual.
 - [x] **Test** (`tests/test_voice_input.py`): parity voice=teks ("Beli makan siang 50 ribu pakai BCA"), tidak auto-simpan, STT gagal/kosong/exception → fallback, low-confidence → review. 6 test OK.
+- [x] **Reporting/UI** (`reporting/`, `financial_engine` +method): Dashboard (total balance, income/expense/net cash flow bulan ini, expense per kategori, recent) & Transaction History (list, filter, search, edit, delete) — **semua angka dari Financial Engine** (`month_summary`, `expense_by_category`, `query_transactions`, `recent_transactions`, `edit_transaction`). Renderer HTML hanya menampilkan data (`docs/prototype/dashboard.html`) + loading/empty/error state.
+- [x] **Test** (`tests/test_reporting.py`): angka dashboard = engine, expense-per-kategori neto & terurut, recent, filter/search/account, edit & delete memengaruhi saldo/dashboard. 9 test OK.
 
 ## Belum Dikerjakan
 - [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database, UX) — blocker sebelum lapisan lain.
