@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+vendor/
+.venv/
+__pycache__/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
