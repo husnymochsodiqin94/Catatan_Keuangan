@@ -192,6 +192,24 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   eksternal (butuh infra & kredensial); hindari over-promise di tahap mockup.
 - **Status:** aktif — UI sudah dimock (layar "Target & Batas"); implementasi menyusul.
 
+## 2026-09-12 — Backend & PWA tanpa dependency pihak ketiga
+- **Keputusan:** Backend memakai **Python stdlib** (`http.server` + `sqlite3`),
+  bukan FastAPI; frontend **PWA statis** (HTML/CSS/JS) tanpa build step/npm.
+  Backend menyajikan API JSON + file PWA di satu origin.
+- **Alasan:** Mempertahankan prinsip nol-dependency yang sudah dijaga (engine/nlp/
+  voice/reporting semuanya stdlib), bisa langsung dijalankan tanpa install/jaringan,
+  dan cukup untuk skala pribadi (single-user). FastAPI/React+Vite dapat diadopsi
+  nanti bila kebutuhan tumbuh.
+- **Status:** aktif.
+
+## 2026-09-12 — Persistensi: transaksi = sumber kebenaran, engine direhidrasi
+- **Keputusan:** Storage SQLite hanya menyimpan akun & transaksi mentah. Tiap
+  operasi merehidrasi `FinancialEngine` dari storage, memakainya untuk validasi &
+  perhitungan (saldo/laporan), lalu menyimpan hasilnya. Tidak ada logika finansial
+  yang diduplikasi di server/frontend; frontend hanya menampilkan angka dari API.
+- **Alasan:** Menjaga satu sumber kebenaran & konsistensi (edit/hapus otomatis benar).
+- **Status:** aktif.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->

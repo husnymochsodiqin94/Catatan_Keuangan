@@ -146,6 +146,15 @@ class FinancialEngine:
             related_transaction_id=related_transaction_id, note=note, source=source,
         ))
 
+    def load_transaction(self, tx: Transaction) -> Transaction:
+        """Muat transaksi yang sudah jadi (mis. rehidrasi dari database) apa adanya.
+
+        Berbeda dari create_*: tidak memvalidasi/menghasilkan id atau tanggal —
+        dipakai untuk memuat kembali data yang sudah tersimpan.
+        """
+        self._transactions.append(tx)
+        return tx
+
     def delete_transaction(self, tx_id: str) -> None:
         """Soft delete: transaksi dikecualikan dari saldo & laporan."""
         for tx in self._transactions:

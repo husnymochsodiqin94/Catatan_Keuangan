@@ -3,12 +3,12 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 10 — Mockup UI (design canvas) untuk PWA.** Keputusan platform: **PWA** (mobile + web + laptop, satu basis kode). Belum ada aplikasi/API/DB nyata.
+**Tahap 11 — PWA + backend tersambung ke Financial Engine (MVP jalan).** Platform: **PWA** (mobile + web + laptop), backend Python stdlib + SQLite. Smoke-test end-to-end OK.
 
-**Mockup (design canvas, Versi 6):** 10 artboard — Home (+banner alert in-app), **Empty/Onboarding**, Capture, Konfirmasi, Riwayat, Anggaran per kategori, Akun (aset/liabilitas/utang-piutang), Statistik (donat + tren), Target & Batas + Alert (Email; WhatsApp menyusul), dan tampilan Web/Laptop. (File kerja di scratchpad sesi; canvas tersimpan sebagai Artifact.)
+Alur nyata berfungsi: buka app → capture (suara/teks) → `POST /api/parse` → konfirmasi draft → `POST /api/transactions` (validasi + simpan via engine) → dashboard (`/api/summary`, semua angka dari engine). Mockup (design canvas, Versi 6) tetap sebagai referensi desain.
 
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **59 test OK**.
-**Regenerate dashboard demo:** `python3 -m reporting.render_demo` → `docs/prototype/dashboard.html`.
+**Cara jalankan:** `python3 -m server.app` → http://127.0.0.1:8000.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **67 test OK**.
 
 ## Roadmap Fitur (dari masukan user, 2026-09-12)
 - **Sudah ada di engine (tinggal disambungkan ke UI):** transfer antar akun, e-wallet, kartu kredit/liabilitas (utang dasar).
@@ -38,6 +38,9 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] **Test** (`tests/test_voice_input.py`): parity voice=teks ("Beli makan siang 50 ribu pakai BCA"), tidak auto-simpan, STT gagal/kosong/exception → fallback, low-confidence → review. 6 test OK.
 - [x] **Reporting/UI** (`reporting/`, `financial_engine` +method): Dashboard (total balance, income/expense/net cash flow bulan ini, expense per kategori, recent) & Transaction History (list, filter, search, edit, delete) — **semua angka dari Financial Engine** (`month_summary`, `expense_by_category`, `query_transactions`, `recent_transactions`, `edit_transaction`). Renderer HTML hanya menampilkan data (`docs/prototype/dashboard.html`) + loading/empty/error state.
 - [x] **Test** (`tests/test_reporting.py`): angka dashboard = engine, expense-per-kategori neto & terurut, recent, filter/search/account, edit & delete memengaruhi saldo/dashboard. 9 test OK.
+- [x] **Backend** (`server/`): Storage SQLite (stdlib) + service (rehidrasi engine, validasi, simpan) + HTTP server (API JSON `/api/accounts|parse|transactions|summary` + penyajian PWA). Nol dependency pihak ketiga.
+- [x] **PWA** (`webapp/`): index/app.js/styles + manifest + service worker; Home/Riwayat/Akun + capture (Web Speech id-ID + teks) → parse → confirm → simpan; onboarding & error/loading state; semua angka dari backend.
+- [x] **Test** (`tests/test_server.py`): akun, parse resolve akun, commit+persist, transfer netral, delete recompute, persistensi lintas rehidrasi. 8 test OK.
 - [x] **Audit MVP** (`docs/AUDIT_REPORT.md`): financial accuracy, AI, security, performance, token/AI-cost. Defect diperbaiki: A1 splitter "hari lalu", A2 angka frasa waktu jadi nominal, P1 repeated processing di `net_worth`. Regresi `TestTemporalNotAmount` ditambahkan.
 
 ## Temuan Audit Terbuka (belum dikerjakan — bukan defect diam-diam)
