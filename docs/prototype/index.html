@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Financial Assistant — Prototype</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#1a1d21; --muted:#6b7280;
+    --line:#e5e7eb; --accent:#2563eb; --accent-ink:#fff;
+    --in:#15803d; --out:#b91c1c; --warn:#b45309; --warnbg:#fef3c7;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    display:flex;justify-content:center}
+  .phone{width:100%;max-width:420px;min-height:100vh;background:var(--bg);
+    display:flex;flex-direction:column;position:relative}
+  header{padding:20px 18px 10px}
+  h1{font-size:15px;margin:0;color:var(--muted);font-weight:600}
+  .summary{display:flex;gap:10px;margin-top:12px}
+  .stat{flex:1;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:12px}
+  .stat .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .stat .value{font-size:18px;font-weight:700;margin-top:4px}
+  .value.in{color:var(--in)} .value.out{color:var(--out)}
+  main{flex:1;padding:6px 18px 120px;overflow:auto}
+  .section-title{font-size:12px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.04em;margin:18px 4px 8px}
+  .row{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .row .emoji{font-size:20px}
+  .row .grow{flex:1}
+  .row .name{font-weight:600}
+  .row .sub{font-size:12px;color:var(--muted)}
+  .amt{font-weight:700} .amt.in{color:var(--in)} .amt.out{color:var(--out)}
+  .empty{text-align:center;color:var(--muted);padding:40px 20px}
+  .empty .big{font-size:34px}
+  /* capture bar */
+  .capture{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;
+    padding:14px 18px calc(14px + env(safe-area-inset-bottom));pointer-events:none}
+  .capture-inner{width:100%;max-width:420px;display:flex;gap:10px;pointer-events:auto}
+  .capture input{flex:1;border:1px solid var(--line);background:var(--card);
+    border-radius:999px;padding:14px 16px;font-size:15px;color:var(--ink);
+    box-shadow:0 6px 20px rgba(0,0,0,.08)}
+  .mic{width:52px;height:52px;flex:none;border-radius:50%;border:none;
+    background:var(--accent);color:var(--accent-ink);font-size:22px;cursor:pointer;
+    box-shadow:0 6px 20px rgba(37,99,235,.4)}
+  .mic:active{transform:scale(.95)}
+  /* sheet */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
+  .scrim.show{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;transform:translateY(110%);
+    transition:transform .25s ease;display:flex;justify-content:center}
+  .sheet.show{transform:translateY(0)}
+  .sheet-inner{width:100%;max-width:420px;background:var(--card);
+    border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom))}
+  .grab{width:40px;height:4px;background:var(--line);border-radius:2px;margin:2px auto 14px}
+  .hint{font-size:13px;color:var(--muted);margin-bottom:10px}
+  /* draft card */
+  .draft h3{margin:2px 0 12px;font-size:16px}
+  .field{display:flex;justify-content:space-between;align-items:center;
+    padding:11px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;
+    cursor:pointer;background:#fafafa}
+  .field:active{background:#f0f0f0}
+  .field .k{font-size:12px;color:var(--muted)}
+  .field .v{font-weight:600;text-align:right}
+  .field.low{border-style:dashed;border-color:var(--warn)}
+  .field.low .v::after{content:" ?";color:var(--warn)}
+  .banner{background:var(--warnbg);color:var(--warn);border-radius:12px;
+    padding:10px 12px;font-size:13px;margin-bottom:10px}
+  .btns{display:flex;gap:10px;margin-top:6px}
+  .btn{flex:1;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--accent);color:var(--accent-ink)}
+  .btn.ghost{background:#eef0f3;color:var(--ink)}
+  .btn[disabled]{opacity:.45;cursor:not-allowed}
+  .loading{text-align:center;padding:26px;color:var(--muted)}
+  .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:s 0.8s linear infinite;margin:0 auto 12px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  /* toast */
+  .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--in);color:#fff;padding:12px 20px;border-radius:999px;font-weight:700;
+    opacity:0;transition:.25s;z-index:30}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .note{font-size:11px;color:var(--muted);text-align:center;padding:8px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <header>
+    <h1>Halo 👋 — AI Financial Assistant</h1>
+    <div class="summary">
+      <div class="stat"><div class="label">Net Worth</div><div class="value" id="nw">Rp4.415.000</div></div>
+      <div class="stat"><div class="label">Cash Flow (bln ini)</div><div class="value out" id="cf">−Rp1.735.000</div></div>
+    </div>
+  </header>
+  <main>
+    <div class="section-title">Saldo Akun</div>
+    <div class="row"><span class="emoji">🏦</span><div class="grow"><div class="name">BCA</div><div class="sub">Bank</div></div><span class="amt">Rp1.165.000</span></div>
+    <div class="row"><span class="emoji">🏦</span><div class="grow"><div class="name">Mandiri</div><div class="sub">Bank</div></div><span class="amt">Rp3.000.000</span></div>
+    <div class="row"><span class="emoji">👛</span><div class="grow"><div class="name">Cash</div><div class="sub">Tunai</div></div><span class="amt">Rp150.000</span></div>
+
+    <div class="section-title">Transaksi Terbaru</div>
+    <div id="list">
+      <div class="empty" id="emptyState">
+        <div class="big">🎤</div>
+        <p>Catat transaksi pertamamu — cukup ucapkan<br><b>"Beli kopi 35 ribu pakai BCA"</b></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Capture bar -->
+  <div class="capture">
+    <div class="capture-inner">
+      <input id="textInput" placeholder="Ketik atau tekan mic — mis. 'Beli kopi 35 ribu pakai BCA'"
+             onkeydown="if(event.key==='Enter')startParse(this.value)"/>
+      <button class="mic" title="Rekam suara" onclick="simulateVoice()">🎤</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Tercatat ✓</div>
+  <div class="note">Prototipe UX statis — parsing hanyalah tiruan, tanpa backend/AI nyata.</div>
+</div>
+
+<!-- Confirmation sheet -->
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-inner" onclick="event.stopPropagation()">
+    <div class="grab"></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<script>
+// ---- Mock "AI" parser (tiruan sederhana untuk demo UX saja) ----
+function mockParse(text){
+  const t=(text||'').toLowerCase();
+  // nominal: "35 ribu", "35rb", "2 juta", "35.000"
+  let amount=null;
+  let m=t.match(/(\d+(?:[.,]\d+)?)\s*(juta|jt)/); if(m) amount=Math.round(parseFloat(m[1].replace(',','.'))*1e6);
+  if(amount===null){m=t.match(/(\d+(?:[.,]\d+)?)\s*(ribu|rb|k)\b/); if(m) amount=Math.round(parseFloat(m[1].replace(',','.'))*1000);}
+  if(amount===null){m=t.match(/(\d[\d.]{2,})/); if(m) amount=parseInt(m[1].replace(/\./g,''),10);}
+  // kategori sederhana
+  const cats=[['kopi','Makanan & Minuman ▸ Kopi','☕'],['makan','Makanan & Minuman','🍽️'],
+    ['bensin','Transport ▸ Bensin','⛽'],['parkir','Transport ▸ Parkir','🅿️'],
+    ['grab','Transport','🚗'],['pulsa','Tagihan ▸ Pulsa','📱'],['gaji','Gaji','💰']];
+  let cat='Lainnya',emoji='💸',low=false;
+  const hit=cats.find(c=>t.includes(c[0]));
+  if(hit){cat=hit[1];emoji=hit[2];} else {low=true;}
+  // akun
+  let account='BCA',accLow=false;
+  if(t.includes('mandiri'))account='Mandiri';
+  else if(t.includes('cash')||t.includes('tunai'))account='Cash';
+  else if(t.includes('gopay'))account='GoPay';
+  else if(!t.includes('bca')) accLow=true; // tak disebut → tebak default, low-confidence
+  // tipe
+  const type=(t.includes('gaji')||t.includes('terima')||t.includes('masuk'))?'Pemasukan':'Pengeluaran';
+  const notTx = amount===null && !hit;
+  return {amount,cat,emoji,catLow:low,account,accLow,type,notTx,raw:text};
+}
+const rp=n=>'Rp'+ (n||0).toLocaleString('id-ID');
+
+let draft=null;
+function simulateVoice(){
+  const samples=['Beli kopi 35 ribu pakai BCA','Bensin 50 ribu','Makan siang 40 ribu pakai Mandiri','Beli sesuatu 20 ribu'];
+  const s=samples[Math.floor(Math.random()*samples.length)];
+  document.getElementById('textInput').value=s;
+  startParse(s);
+}
+function startParse(text){
+  if(!text||!text.trim())return;
+  openSheet();
+  document.getElementById('sheetBody').innerHTML=
+    '<div class="loading"><div class="spin"></div>Memahami…</div>';
+  setTimeout(()=>renderDraft(mockParse(text)),900); // simulasi latensi AI
+}
+function renderDraft(d){
+  draft=d;
+  const body=document.getElementById('sheetBody');
+  if(d.notTx){
+    body.innerHTML='<div class="draft"><h3>Bukan transaksi?</h3>'+
+      '<div class="banner">Sepertinya ini bukan transaksi. Coba sebutkan nominalnya.</div>'+
+      '<div class="btns"><button class="btn ghost" onclick="closeSheet()">Tutup</button></div></div>';
+    return;
+  }
+  const incomplete = d.amount===null;
+  body.innerHTML='<div class="draft"><h3>Konfirmasi transaksi</h3>'+
+    (incomplete?'<div class="banner">Nominal belum terbaca — lengkapi dulu.</div>':'')+
+    field('Jenis',d.type,false)+
+    field('Nominal',d.amount===null?'—':rp(d.amount),d.amount===null)+
+    field('Kategori',d.cat,d.catLow)+
+    field('Akun',d.account,d.accLow)+
+    field('Tanggal','Hari ini',false)+
+    '<div class="btns">'+
+      '<button class="btn ghost" onclick="closeSheet()">Batal</button>'+
+      '<button class="btn primary" '+(incomplete?'disabled':'')+' onclick="save()">Simpan</button>'+
+    '</div>'+
+    '<p class="hint" style="margin-top:10px">Ketuk field mana pun untuk mengoreksi (demo: field low-confidence bertanda putus &amp; "?").</p>'+
+  '</div>';
+}
+function field(k,v,low){
+  return '<div class="field'+(low?' low':'')+'"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>';
+}
+function save(){
+  closeSheet();
+  // hilangkan empty state, tambahkan ke list
+  const es=document.getElementById('emptyState'); if(es)es.remove();
+  const list=document.getElementById('list');
+  const isIn=draft.type==='Pemasukan';
+  const el=document.createElement('div'); el.className='row';
+  el.innerHTML='<span class="emoji">'+draft.emoji+'</span><div class="grow"><div class="name">'+
+    draft.cat+'</div><div class="sub">'+draft.account+' · Hari ini</div></div>'+
+    '<span class="amt '+(isIn?'in':'out')+'">'+(isIn?'+':'−')+rp(draft.amount)+'</span>';
+  list.prepend(el);
+  toast();
+}
+function openSheet(){document.getElementById('scrim').classList.add('show');document.getElementById('sheet').classList.add('show');}
+function closeSheet(){document.getElementById('scrim').classList.remove('show');document.getElementById('sheet').classList.remove('show');document.getElementById('textInput').value='';}
+function toast(){const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600);}
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 _Terakhir diperbarui: 2026-09-12_
 
 ## Fase Saat Ini
-**Tahap 3 — Database & System Architecture selesai.** Belum ada kode aplikasi.
+**Tahap 4 — UX/UI MVP selesai.** Belum ada kode aplikasi (hanya prototipe UX statis).
 
 ## Sudah Dikerjakan
 - [x] Inisialisasi repository git (branch `claude/financial-assistant-setup-n1aqkd`).
@@ -16,9 +16,11 @@ _Terakhir diperbarui: 2026-09-12_
 - [x] `docs/FINANCIAL_RULES.md` — aturan keuangan (Tahap 2: income/expense/transfer/refund/adjustment, tipe akun, formula balance/cash flow/net worth, anti double-counting CC, duplikat, contoh, edge cases, test cases).
 - [x] `docs/SYSTEM_ARCHITECTURE.md` — arsitektur MVP (Tahap 3: modular monolith, komponen, data flow, API/AI/financial/security boundary, rekomendasi teknologi, trade-offs).
 - [x] `docs/DATABASE_DESIGN.md` — desain DB MVP (Tahap 3: evaluasi entity, ERD, field/PK/FK/index/constraint, pemetaan tipe transaksi ke from/to, deletion & audit).
+- [x] `docs/UX_UI_MVP.md` — desain UX MVP (Tahap 4: IA, screen hierarchy, user flow, komponen, UI states, spesifikasi layar, microcopy).
+- [x] `docs/prototype/index.html` — prototipe UX statis alur inti Capture→Preview→Simpan (parser tiruan, tanpa backend/AI).
 
 ## Belum Dikerjakan
-- [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database) — blocker sebelum implementasi.
+- [ ] **Jawab OPEN QUESTIONS** yang terkumpul (produk, finansial, arsitektur, database, UX) — blocker sebelum implementasi.
 - [ ] Tahap berikutnya: rencana implementasi / scaffolding kode (menunggu instruksi & keputusan stack).
 - [ ] Pemilihan stack teknologi (bahasa/framework).
 - [ ] Desain model data transaksi.
