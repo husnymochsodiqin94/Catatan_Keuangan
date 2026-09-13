@@ -650,7 +650,9 @@ function categoryOptions(sel, type) {
   });
   // Nilai terpilih yang tak ada di listing (mis. transaksi lama) tetap ditampilkan.
   if (sel && !seen.has(sel)) html = `<optgroup label="Lainnya">${opt(sel)}</optgroup>` + html;
-  return html || opt(sel || "");
+  // Placeholder: jika AI belum yakin, jangan diam-diam pilih kategori pertama.
+  const placeholder = `<option value="" ${!sel ? "selected" : ""}>— Pilih kategori —</option>`;
+  return placeholder + html;
 }
 function showConfirm(d) {
   draft = d;
