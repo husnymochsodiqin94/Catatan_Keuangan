@@ -50,12 +50,17 @@ CREATE TABLE IF NOT EXISTS transactions (
     deleted INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS ix_tx_user ON transactions(user_id);
-CREATE INDEX IF NOT EXISTS ix_acc_user ON accounts(user_id);
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id TEXT PRIMARY KEY,
     data TEXT NOT NULL
 );
+"""
+
+# Index dibuat SETELAH _migrate() agar DB lama (yang belum punya kolom
+# user_id) mendapatkan kolomnya lebih dulu.
+_INDEXES = """
+CREATE INDEX IF NOT EXISTS ix_tx_user ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS ix_acc_user ON accounts(user_id);
 """
 
 _EDITABLE_TX = ("amount", "category", "note", "occurred_at",
@@ -68,14 +73,21 @@ class Storage:
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
         self._migrate()
+        self._db.executescript(_INDEXES)
         self._db.commit()
 
     def _migrate(self) -> None:
-        # Tambah kolom user_id pada DB lama (single-user) agar tidak error.
-        for table in ("accounts", "transactions"):
-            cols = {r["name"] for r in self._db.execute(f"PRAGMA table_info({table})")}
-            if "user_id" not in cols:
-                self._db.execute(f"ALTER TABLE {table} ADD COLUMN user_id TEXT")
+        # Tambah kolom yang belum ada pada DB lama agar skema baru tetap jalan.
+        # (mis. DB single-user lama belum punya user_id/archived.)
+        wanted = {
+            "accounts": [("user_id", "TEXT"), ("archived", "INTEGER NOT NULL DEFAULT 0")],
+            "transactions": [("user_id", "TEXT")],
+        }
+        for table, columns in wanted.items():
+            existing = {r["name"] for r in self._db.execute(f"PRAGMA table_info({table})")}
+            for name, decl in columns:
+                if name not in existing:
+                    self._db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
     # ------------------------------------------------------------------ #
     # Pengguna & sesi
