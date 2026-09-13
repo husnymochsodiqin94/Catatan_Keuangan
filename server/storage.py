@@ -1,7 +1,7 @@
-"""Persistensi SQLite (stdlib) untuk akun & transaksi.
+"""Persistensi SQLite (stdlib) — multi-user.
 
-Menyimpan data mentah; perhitungan (saldo/laporan) tetap dilakukan Financial
-Engine. Transaksi = sumber kebenaran, saldo = turunan.
+Menyimpan pengguna, sesi, akun, transaksi, dan pengaturan; semua data keuangan
+ter-scope per ``user_id``. Perhitungan tetap dilakukan Financial Engine.
 """
 
 from __future__ import annotations
@@ -13,8 +13,21 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    display_name TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
+    user_id TEXT,
     name TEXT NOT NULL,
     type TEXT NOT NULL,
     currency TEXT NOT NULL DEFAULT 'IDR',
@@ -24,6 +37,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY,
+    user_id TEXT,
     type TEXT NOT NULL,
     amount INTEGER NOT NULL,
     occurred_at TEXT NOT NULL,
@@ -36,9 +50,10 @@ CREATE TABLE IF NOT EXISTS transactions (
     deleted INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS ix_tx_occurred ON transactions(occurred_at);
-CREATE TABLE IF NOT EXISTS settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
+CREATE INDEX IF NOT EXISTS ix_tx_user ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS ix_acc_user ON accounts(user_id);
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id TEXT PRIMARY KEY,
     data TEXT NOT NULL
 );
 """
@@ -49,34 +64,88 @@ _EDITABLE_TX = ("amount", "category", "note", "occurred_at",
 
 class Storage:
     def __init__(self, db_path: str = "data.db"):
-        # check_same_thread=False: http.server dapat memakai thread berbeda.
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
+        self._migrate()
         self._db.commit()
 
-    # ---- akun ------------------------------------------------------- #
-    def add_account(self, name: str, type: str, starting_balance: int = 0,
-                    currency: str = "IDR") -> Dict[str, Any]:
+    def _migrate(self) -> None:
+        # Tambah kolom user_id pada DB lama (single-user) agar tidak error.
+        for table in ("accounts", "transactions"):
+            cols = {r["name"] for r in self._db.execute(f"PRAGMA table_info({table})")}
+            if "user_id" not in cols:
+                self._db.execute(f"ALTER TABLE {table} ADD COLUMN user_id TEXT")
+
+    # ------------------------------------------------------------------ #
+    # Pengguna & sesi
+    # ------------------------------------------------------------------ #
+    def create_user(self, email: str, password_hash: str,
+                    display_name: str = "") -> Dict[str, Any]:
+        user = {
+            "id": "usr_" + uuid.uuid4().hex[:12], "email": email,
+            "password_hash": password_hash, "display_name": display_name or email.split("@")[0],
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        self._db.execute(
+            "INSERT INTO users(id,email,password_hash,display_name,created_at)"
+            " VALUES(:id,:email,:password_hash,:display_name,:created_at)", user)
+        self._db.commit()
+        return user
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        row = self._db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        return dict(row) if row else None
+
+    def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+        row = self._db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+    def create_session(self, user_id: str) -> str:
+        import secrets
+        token = secrets.token_urlsafe(32)
+        self._db.execute("INSERT INTO sessions(token,user_id,created_at) VALUES(?,?,?)",
+                         (token, user_id, datetime.now().isoformat(timespec="seconds")))
+        self._db.commit()
+        return token
+
+    def get_session_user(self, token: str) -> Optional[str]:
+        if not token:
+            return None
+        row = self._db.execute("SELECT user_id FROM sessions WHERE token=?", (token,)).fetchone()
+        return row["user_id"] if row else None
+
+    def delete_session(self, token: str) -> None:
+        self._db.execute("DELETE FROM sessions WHERE token=?", (token,))
+        self._db.commit()
+
+    # ------------------------------------------------------------------ #
+    # Akun (per user)
+    # ------------------------------------------------------------------ #
+    def add_account(self, user_id: str, name: str, type: str,
+                    starting_balance: int = 0, currency: str = "IDR") -> Dict[str, Any]:
         acc = {
-            "id": "acc_" + uuid.uuid4().hex[:12], "name": name, "type": type,
+            "id": "acc_" + uuid.uuid4().hex[:12], "user_id": user_id, "name": name, "type": type,
             "currency": currency, "starting_balance": int(starting_balance),
             "archived": 0, "created_at": datetime.now().isoformat(timespec="seconds"),
         }
         self._db.execute(
-            "INSERT INTO accounts(id,name,type,currency,starting_balance,archived,created_at)"
-            " VALUES(:id,:name,:type,:currency,:starting_balance,:archived,:created_at)", acc)
+            "INSERT INTO accounts(id,user_id,name,type,currency,starting_balance,archived,created_at)"
+            " VALUES(:id,:user_id,:name,:type,:currency,:starting_balance,:archived,:created_at)", acc)
         self._db.commit()
         return acc
 
-    def list_accounts(self) -> List[Dict[str, Any]]:
-        rows = self._db.execute("SELECT * FROM accounts ORDER BY created_at").fetchall()
+    def list_accounts(self, user_id: str) -> List[Dict[str, Any]]:
+        rows = self._db.execute(
+            "SELECT * FROM accounts WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
         return [dict(r) for r in rows]
 
-    # ---- transaksi -------------------------------------------------- #
-    def add_transaction(self, tx: Dict[str, Any]) -> Dict[str, Any]:
+    # ------------------------------------------------------------------ #
+    # Transaksi (per user)
+    # ------------------------------------------------------------------ #
+    def add_transaction(self, user_id: str, tx: Dict[str, Any]) -> Dict[str, Any]:
         row = {
-            "id": "tx_" + uuid.uuid4().hex[:12],
+            "id": "tx_" + uuid.uuid4().hex[:12], "user_id": user_id,
             "type": tx["type"], "amount": int(tx["amount"]),
             "occurred_at": tx["occurred_at"],
             "from_account_id": tx.get("from_account_id"),
@@ -87,37 +156,42 @@ class Storage:
             "created_at": datetime.now().isoformat(timespec="seconds"),
         }
         self._db.execute(
-            "INSERT INTO transactions(id,type,amount,occurred_at,from_account_id,to_account_id,"
+            "INSERT INTO transactions(id,user_id,type,amount,occurred_at,from_account_id,to_account_id,"
             "category,note,related_transaction_id,source,deleted,created_at) VALUES("
-            ":id,:type,:amount,:occurred_at,:from_account_id,:to_account_id,:category,:note,"
+            ":id,:user_id,:type,:amount,:occurred_at,:from_account_id,:to_account_id,:category,:note,"
             ":related_transaction_id,:source,:deleted,:created_at)", row)
         self._db.commit()
         return row
 
-    def list_transactions(self, include_deleted: bool = False) -> List[Dict[str, Any]]:
-        sql = "SELECT * FROM transactions"
+    def list_transactions(self, user_id: str, include_deleted: bool = False) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM transactions WHERE user_id=?"
         if not include_deleted:
-            sql += " WHERE deleted=0"
-        return [dict(r) for r in self._db.execute(sql).fetchall()]
+            sql += " AND deleted=0"
+        return [dict(r) for r in self._db.execute(sql, (user_id,)).fetchall()]
 
-    def soft_delete(self, tx_id: str) -> bool:
-        cur = self._db.execute("UPDATE transactions SET deleted=1 WHERE id=?", (tx_id,))
+    def soft_delete(self, user_id: str, tx_id: str) -> bool:
+        cur = self._db.execute(
+            "UPDATE transactions SET deleted=1 WHERE id=? AND user_id=?", (tx_id, user_id))
         self._db.commit()
         return cur.rowcount > 0
 
-    def update_transaction(self, tx_id: str, fields: Dict[str, Any]) -> bool:
+    def update_transaction(self, user_id: str, tx_id: str, fields: Dict[str, Any]) -> bool:
         cols = [k for k in fields if k in _EDITABLE_TX]
         if not cols:
             return False
         sets = ", ".join(f"{c}=?" for c in cols)
-        params = [fields[c] for c in cols] + [tx_id]
-        cur = self._db.execute(f"UPDATE transactions SET {sets} WHERE id=?", params)
+        params = [fields[c] for c in cols] + [tx_id, user_id]
+        cur = self._db.execute(
+            f"UPDATE transactions SET {sets} WHERE id=? AND user_id=?", params)
         self._db.commit()
         return cur.rowcount > 0
 
-    # ---- settings (JSON tunggal) ------------------------------------ #
-    def get_settings(self) -> Dict[str, Any]:
-        row = self._db.execute("SELECT data FROM settings WHERE id=1").fetchone()
+    # ------------------------------------------------------------------ #
+    # Pengaturan (per user, JSON)
+    # ------------------------------------------------------------------ #
+    def get_settings(self, user_id: str) -> Dict[str, Any]:
+        row = self._db.execute(
+            "SELECT data FROM user_settings WHERE user_id=?", (user_id,)).fetchone()
         if not row:
             return {}
         try:
@@ -125,11 +199,11 @@ class Storage:
         except (ValueError, TypeError):
             return {}
 
-    def save_settings(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def save_settings(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         payload = json.dumps(data, ensure_ascii=False)
         self._db.execute(
-            "INSERT INTO settings(id,data) VALUES(1,?) "
-            "ON CONFLICT(id) DO UPDATE SET data=excluded.data", (payload,))
+            "INSERT INTO user_settings(user_id,data) VALUES(?,?) "
+            "ON CONFLICT(user_id) DO UPDATE SET data=excluded.data", (user_id, payload))
         self._db.commit()
         return data
 

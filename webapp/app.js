@@ -9,27 +9,54 @@ const esc = (s) => (s == null ? "" : String(s).replace(/[&<>"']/g, (c) =>
 const TYPE_LABEL = { income: "Pemasukan", expense: "Pengeluaran", transfer: "Transfer", refund: "Refund" };
 
 function getToken() { try { return localStorage.getItem("ck_token") || ""; } catch (_) { return ""; } }
+function setToken(t) { try { localStorage.setItem("ck_token", t); } catch (_) {} }
+function clearToken() { try { localStorage.removeItem("ck_token"); } catch (_) {} }
 async function api(method, path, body) {
   const opt = { method, headers: {} };
   const tok = getToken(); if (tok) opt.headers["X-Token"] = tok;
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   const res = await fetch(path, opt);
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401) { showUnlock(); throw new Error("Perlu token akses"); }
+  if (res.status === 401) { clearToken(); showAuth("login"); throw new Error("Sesi berakhir, silakan masuk"); }
   if (!res.ok) throw new Error(data.error || "Terjadi kesalahan");
   return data;
 }
-function showUnlock() {
-  VIEW = "__lock";
+
+const MIC_SVG = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2a3 3 0 013 3v6a3 3 0 01-6 0V5a3 3 0 013-3z"/><path d="M19 10a7 7 0 01-14 0"/><path d="M12 19v3"/></svg>';
+function showAuth(mode) {
+  VIEW = "__auth";
   $("topbar").innerHTML = ""; $("nav").innerHTML = ""; $("fab").hidden = true;
-  $("view").innerHTML = `<div class="lock">
-    <div class="logo"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2a3 3 0 013 3v6a3 3 0 01-6 0V5a3 3 0 013-3z"/><path d="M19 10a7 7 0 01-14 0"/><path d="M12 19v3"/></svg></div>
-    <h1>Masuk</h1><p class="muted">Masukkan token akses untuk membuka aplikasi.</p>
-    <input class="field" id="lk-token" type="password" placeholder="Token akses" />
-    <button class="btn primary" id="lk-go" style="margin-top:14px">Masuk</button></div>`;
-  const go2 = () => { const t = $("lk-token").value.trim(); if (!t) return; try { localStorage.setItem("ck_token", t); } catch (_) {} $("fab").hidden = false; go("home"); };
-  $("lk-go").addEventListener("click", go2);
-  $("lk-token").addEventListener("keydown", (e) => { if (e.key === "Enter") go2(); });
+  const login = mode !== "register";
+  $("view").innerHTML = `<div class="auth">
+    <div class="logo">${MIC_SVG}</div>
+    <h1>${login ? "Selamat Datang" : "Buat Akun"}</h1>
+    <p class="muted">${login ? "Kelola keuangan Anda dengan asisten cerdas." : "Daftar untuk mulai mencatat keuangan."}</p>
+    ${login ? "" : `<label class="fl">Nama</label><input class="field" id="au-name" placeholder="Nama Anda" />`}
+    <label class="fl">Email</label><input class="field" id="au-email" type="email" placeholder="Alamat email Anda" />
+    <label class="fl">Kata Sandi</label><input class="field" id="au-pass" type="password" placeholder="${login ? "Masukkan kata sandi" : "Minimal 6 karakter"}" />
+    <button class="btn primary" id="au-go" style="margin-top:16px">${login ? "MASUK" : "DAFTAR"}</button>
+    ${login ? `<div style="text-align:center;margin-top:12px"><a id="au-forgot" style="cursor:pointer">Lupa Kata Sandi?</a></div>
+    <div class="or">Atau masuk dengan</div>
+    <div class="socials"><div class="soc" data-soon>Google</div><div class="soc" data-soon>Apple</div><div class="soc" data-soon>Facebook</div></div>
+    <div class="voice-card" data-soon><span class="vic">${MIC_SVG.replace('#fff','#06B6D4').replace('30" height="30','20" height="20')}</span><div><b>Suara Quick-Login</b><div class="s">Masuk dengan Suara (Lebih Cepat)</div></div></div>` : ""}
+    <div style="text-align:center;margin-top:20px" class="muted">${login ? 'Belum punya akun? <a id="au-switch" style="cursor:pointer">Daftar Sekarang</a>' : 'Sudah punya akun? <a id="au-switch" style="cursor:pointer">Masuk</a>'}</div>
+  </div>`;
+  const submit = async () => {
+    const email = ($("au-email").value || "").trim();
+    const pass = $("au-pass").value || "";
+    if (!email || !pass) return toast("Isi email & kata sandi", true);
+    try {
+      const body = login ? { email, password: pass }
+        : { email, password: pass, display_name: ($("au-name").value || "").trim() };
+      const out = await api("POST", login ? "/api/auth/login" : "/api/auth/register", body);
+      setToken(out.token); $("fab").hidden = false; go("home");
+    } catch (e) { toast(e.message, true); }
+  };
+  $("au-go").addEventListener("click", submit);
+  $("au-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+  $("au-switch").addEventListener("click", () => showAuth(login ? "register" : "login"));
+  const fg = $("au-forgot"); if (fg) fg.addEventListener("click", () => toast("Fitur reset kata sandi segera hadir"));
+  $("view").querySelectorAll("[data-soon]").forEach((el) => el.addEventListener("click", () => toast("Fitur ini segera hadir")));
 }
 
 let ACCOUNTS = [];
@@ -70,7 +97,7 @@ async function render() {
     else if (VIEW === "anggaran") await renderAnggaran();
     else if (VIEW === "accounts") await renderAccounts();
   } catch (e) {
-    if (VIEW === "__lock") return; // layar kunci sedang tampil
+    if (VIEW === "__auth") return; // layar login sedang tampil
     v.innerHTML = `<div class="empty"><div class="big">⚠️</div><p>${esc(e.message)}</p></div>`;
   }
 }
@@ -201,15 +228,25 @@ async function delTx(id) {
 // ---- ACCOUNTS ------------------------------------------------------ //
 async function renderAccounts() {
   $("topbar").innerHTML = `<h1>Akun</h1>`;
-  const accts = await api("GET", "/api/accounts");
+  const [accts, me] = await Promise.all([
+    api("GET", "/api/accounts"), api("GET", "/api/auth/me").catch(() => null),
+  ]);
   ACCOUNTS = accts;
   const total = accts.filter((a) => a.type !== "credit_card").reduce((s, a) => s + a.balance, 0);
   $("view").innerHTML = `
-    <div class="cards"><div class="card hero wide"><div class="label">Total Saldo</div><div class="value">${rp(total)}</div></div></div>
+    ${me ? `<div class="user-row"><div class="uav">${esc((me.display_name || me.email || "?")[0].toUpperCase())}</div>
+      <div class="grow"><div class="nm">${esc(me.display_name || "")}</div><div class="sub">${esc(me.email || "")}</div></div>
+      <button class="act-btn" id="logout">Keluar</button></div>` : ""}
+    <div class="card hero balance"><div class="label">Total Saldo</div><div class="value">${rp(total)}</div></div>
     <div class="sec">Daftar Akun</div>
     <div>${accts.map(acctRow).join("") || '<p class="muted">Belum ada akun.</p>'}</div>
     <button class="btn primary" id="add-acc" style="margin-top:14px">+ Tambah Akun</button>`;
   $("add-acc").addEventListener("click", showAddAccount);
+  const lo = $("logout");
+  if (lo) lo.addEventListener("click", async () => {
+    try { await api("POST", "/api/auth/logout"); } catch (_) {}
+    clearToken(); showAuth("login"); toast("Anda keluar");
+  });
 }
 function acctRow(a) {
   const T = { bank: "Bank", cash: "Tunai", ewallet: "E-wallet", credit_card: "Kartu kredit" };
@@ -445,7 +482,12 @@ $("fab").addEventListener("click", async () => {
   try { ACCOUNTS = await api("GET", "/api/accounts"); } catch (_) {}
   openCapture();
 });
-render();
+async function init() {
+  if (!getToken()) { showAuth("login"); return; }
+  try { await api("GET", "/api/auth/me"); $("fab").hidden = false; render(); }
+  catch (_) { /* 401 sudah memunculkan layar login */ }
+}
+init();
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }

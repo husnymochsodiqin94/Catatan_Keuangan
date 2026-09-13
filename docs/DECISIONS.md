@@ -237,6 +237,17 @@ Status: `aktif` | `digantikan` | `dibatalkan`.
   otomatis; tetap tanpa dependency aplikasi (image hanya menjalankan stdlib).
 - **Status:** aktif.
 
+## 2026-09-13 — Autentikasi multi-user (email+password), data per-user
+- **Keputusan:** Aplikasi kini multi-user. Password di-hash dengan PBKDF2-HMAC-SHA256
+  (stdlib, tanpa dependency), sesi via token acak (tabel `sessions`), dikirim sebagai
+  header `X-Token`. Seluruh data keuangan ter-scope `user_id` (isolasi antar pengguna).
+  Endpoint publik hanya `register`/`login`/`health`. Gate `CATATAN_TOKEN` lama diganti
+  auth ini. Login sosial (Google/Apple/FB) & Suara Quick-Login ditandai "segera hadir"
+  (belum diimplementasikan; tidak dibuat palsu).
+- **Alasan:** Permintaan pengguna atas login penuh; tetap tanpa dependency & menjaga
+  privasi data antar pengguna.
+- **Status:** aktif. Lanjutan mungkin: reset password (email), OAuth sosial nyata.
+
 ---
 
 <!-- Tambahkan keputusan baru di atas garis ini, entri terbaru di paling bawah bagian atas. -->

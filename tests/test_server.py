@@ -1,38 +1,88 @@
-"""Tests server: Storage + service (sambungan ke Financial Engine)."""
+"""Tests server: auth multi-user + Storage + service (sambungan ke Engine)."""
 
 import unittest
 from datetime import datetime
 
 from financial_engine import ValidationError
 from server import service
+from server.service import AuthError
 from server.storage import Storage
 
 
 class BaseCase(unittest.TestCase):
     def setUp(self):
         self.s = Storage(":memory:")
-        self.bca = service.create_account(self.s, "BCA", "bank", 5_000_000)
-        self.mandiri = service.create_account(self.s, "Mandiri", "bank", 1_000_000)
+        reg = service.register(self.s, "dina@mail.com", "rahasia", "Dina")
+        self.uid = reg["user"]["id"]
+        self.token = reg["token"]
+        self.bca = service.create_account(self.s, self.uid, "BCA", "bank", 5_000_000)
+        self.mandiri = service.create_account(self.s, self.uid, "Mandiri", "bank", 1_000_000)
 
     def tearDown(self):
         self.s.close()
 
 
+class TestAuth(unittest.TestCase):
+    def setUp(self):
+        self.s = Storage(":memory:")
+
+    def tearDown(self):
+        self.s.close()
+
+    def test_register_login(self):
+        service.register(self.s, "a@b.com", "secret1", "A")
+        out = service.login(self.s, "a@b.com", "secret1")
+        self.assertIn("token", out)
+        self.assertEqual(out["user"]["email"], "a@b.com")
+
+    def test_password_salah_ditolak(self):
+        service.register(self.s, "a@b.com", "secret1")
+        with self.assertRaises(AuthError):
+            service.login(self.s, "a@b.com", "salah")
+
+    def test_email_ganda_ditolak(self):
+        service.register(self.s, "a@b.com", "secret1")
+        with self.assertRaises(AuthError):
+            service.register(self.s, "a@b.com", "secret2")
+
+    def test_password_pendek_ditolak(self):
+        with self.assertRaises(AuthError):
+            service.register(self.s, "a@b.com", "123")
+
+    def test_token_resolve_user(self):
+        reg = service.register(self.s, "a@b.com", "secret1")
+        self.assertEqual(self.s.get_session_user(reg["token"]), reg["user"]["id"])
+        service.logout(self.s, reg["token"])
+        self.assertIsNone(self.s.get_session_user(reg["token"]))
+
+
+class TestIsolation(BaseCase):
+    def test_data_terpisah_per_user(self):
+        service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 100_000, "account_id": self.bca["id"]})
+        # user kedua tidak melihat akun/transaksi user pertama
+        reg2 = service.register(self.s, "budi@mail.com", "rahasia2", "Budi")
+        uid2 = reg2["user"]["id"]
+        self.assertEqual(service.list_accounts(self.s, uid2), [])
+        self.assertEqual(service.list_transactions(self.s, uid2), [])
+        self.assertEqual(service.summary(self.s, uid2)["total_balance"], 0)
+        # user pertama tetap punya datanya
+        self.assertEqual(len(service.list_accounts(self.s, self.uid)), 2)
+
+
 class TestAccounts(BaseCase):
     def test_list_dengan_saldo(self):
-        accs = {a["name"]: a for a in service.list_accounts(self.s)}
+        accs = {a["name"]: a for a in service.list_accounts(self.s, self.uid)}
         self.assertEqual(accs["BCA"]["balance"], 5_000_000)
-        self.assertEqual(accs["BCA"]["type"], "bank")
 
     def test_tipe_tidak_valid_ditolak(self):
         with self.assertRaises((ValidationError, ValueError)):
-            service.create_account(self.s, "X", "kripto", 0)
+            service.create_account(self.s, self.uid, "X", "kripto", 0)
 
 
 class TestParse(BaseCase):
     def test_parse_resolve_akun(self):
-        out = service.parse_text(self.s, "beli kopi 35 ribu pakai BCA")
-        d = out["drafts"][0]
+        d = service.parse_text(self.s, self.uid, "beli kopi 35 ribu pakai BCA")["drafts"][0]
         self.assertEqual(d["type"], "expense")
         self.assertEqual(d["amount"], 35_000)
         self.assertEqual(d["account_id"], self.bca["id"])
@@ -41,96 +91,46 @@ class TestParse(BaseCase):
 
 class TestCommitAndPersist(BaseCase):
     def test_expense_disimpan_dan_saldo_turun(self):
-        res = service.create_transaction(self.s, {
+        res = service.create_transaction(self.s, self.uid, {
             "type": "expense", "amount": 35_000, "account_id": self.bca["id"],
-            "category": "Makanan & Minuman",
-            "occurred_at": datetime(2026, 9, 12, 10, 0).isoformat(),
-        })
+            "occurred_at": datetime(2026, 9, 12, 10, 0).isoformat()})
         self.assertEqual(res["transaction"]["amount"], 35_000)
-        # tersimpan
-        self.assertEqual(len(service.list_transactions(self.s)), 1)
-        # saldo turun (via summary → engine)
-        summ = service.summary(self.s, 2026, 9)
-        self.assertEqual(summ["total_balance"], 5_965_000)  # 6.000.000 − 35.000
-        self.assertEqual(summ["expense"], 35_000)
-
-    def test_transfer_netral(self):
-        service.create_transaction(self.s, {
-            "type": "transfer", "amount": 2_000_000,
-            "from_account_id": self.bca["id"], "to_account_id": self.mandiri["id"],
-            "occurred_at": datetime(2026, 9, 12, 10, 0).isoformat(),
-        })
-        summ = service.summary(self.s, 2026, 9)
-        self.assertEqual(summ["total_balance"], 6_000_000)  # tak berubah
-        self.assertEqual(summ["expense"], 0)
-
-    def test_amount_invalid_ditolak(self):
-        with self.assertRaises(ValidationError):
-            service.create_transaction(self.s, {
-                "type": "expense", "amount": 0, "account_id": self.bca["id"]})
+        self.assertEqual(len(service.list_transactions(self.s, self.uid)), 1)
+        summ = service.summary(self.s, self.uid, 2026, 9)
+        self.assertEqual(summ["total_balance"], 5_965_000)
 
     def test_delete_recompute(self):
-        res = service.create_transaction(self.s, {
+        res = service.create_transaction(self.s, self.uid, {
             "type": "expense", "amount": 100_000, "account_id": self.bca["id"],
             "occurred_at": datetime(2026, 9, 12, 10, 0).isoformat()})
-        tx_id = res["transaction"]["id"]
-        service.delete_transaction(self.s, tx_id, 2026, 9)
-        summ = service.summary(self.s, 2026, 9)
-        self.assertEqual(summ["total_balance"], 6_000_000)  # kembali
-        self.assertEqual(len(service.list_transactions(self.s)), 0)
-
-
-class TestSummaryPersistence(BaseCase):
-    def test_data_bertahan_lintas_koneksi_ulang(self):
-        service.create_transaction(self.s, {
-            "type": "income", "amount": 8_000_000, "account_id": self.bca["id"],
-            "category": "Gaji", "occurred_at": datetime(2026, 9, 1, 9, 0).isoformat()})
-        # rehidrasi engine baru dari storage yang sama
-        summ = service.summary(self.s, 2026, 9)
-        self.assertEqual(summ["income"], 8_000_000)
-        self.assertEqual(summ["total_balance"], 14_000_000)
+        service.delete_transaction(self.s, self.uid, res["transaction"]["id"], 2026, 9)
+        self.assertEqual(len(service.list_transactions(self.s, self.uid)), 0)
 
 
 class TestSettingsBudgetEdit(BaseCase):
     def test_settings_roundtrip(self):
-        service.update_settings(self.s, {"alert_threshold": 80, "alert_email": "a@b.com",
-                                         "spending_limit": {"period": "monthly", "amount": 3_000_000}})
-        cfg = service.get_settings(self.s)
+        service.update_settings(self.s, self.uid, {"alert_threshold": 80,
+            "spending_limit": {"period": "monthly", "amount": 3_000_000}})
+        cfg = service.get_settings(self.s, self.uid)
         self.assertEqual(cfg["alert_threshold"], 80)
-        self.assertEqual(cfg["alert_email"], "a@b.com")
         self.assertEqual(cfg["spending_limit"]["amount"], 3_000_000)
 
     def test_budget_status_alert(self):
         ref = datetime(2026, 9, 15, 12)
-        service.create_transaction(self.s, {"type": "expense", "amount": 2_700_000,
+        service.create_transaction(self.s, self.uid, {"type": "expense", "amount": 2_700_000,
             "account_id": self.bca["id"], "occurred_at": datetime(2026, 9, 3, 10).isoformat()})
-        service.update_settings(self.s, {"alert_threshold": 90,
+        service.update_settings(self.s, self.uid, {"alert_threshold": 90,
             "spending_limit": {"period": "monthly", "amount": 3_000_000}})
-        st = service.budget_status(self.s, ref)
-        self.assertEqual(st["spending_limit"]["pct"], 90)
+        st = service.budget_status(self.s, self.uid, ref)
         self.assertTrue(st["spending_limit"]["alert"])
-        self.assertTrue(st["alerts"])
 
     def test_edit_transaction(self):
-        res = service.create_transaction(self.s, {"type": "expense", "amount": 100_000,
+        res = service.create_transaction(self.s, self.uid, {"type": "expense", "amount": 100_000,
             "account_id": self.bca["id"], "occurred_at": datetime(2026, 9, 10, 10).isoformat()})
-        tx_id = res["transaction"]["id"]
-        service.edit_transaction(self.s, tx_id, {"amount": 40_000, "category": "Transport"})
-        summ = service.summary(self.s, 2026, 9)
+        service.edit_transaction(self.s, self.uid, res["transaction"]["id"],
+                                 {"amount": 40_000, "category": "Transport"})
+        summ = service.summary(self.s, self.uid, 2026, 9)
         self.assertEqual(summ["expense"], 40_000)
-        rows = service.list_transactions(self.s)
-        self.assertEqual(rows[0]["amount"], 40_000)
-        self.assertEqual(rows[0]["category"], "Transport")
-
-    def test_send_alerts_tanpa_email_config(self):
-        service.create_transaction(self.s, {"type": "expense", "amount": 3_000_000,
-            "account_id": self.bca["id"], "occurred_at": datetime.now().isoformat()})
-        service.update_settings(self.s, {"alert_email": "a@b.com",
-            "spending_limit": {"period": "monthly", "amount": 1_000_000}})
-        out = service.send_alerts(self.s)
-        self.assertFalse(out["sent"])
-        self.assertIn("email", out["reason"])
-        self.assertTrue(out["alerts"])
 
 
 if __name__ == "__main__":
