@@ -72,6 +72,26 @@ function openSheet() { $("scrim").classList.add("show"); $("sheet").classList.ad
 function closeSheet() { $("scrim").classList.remove("show"); $("sheet").classList.remove("show"); stopVoice(); }
 $("scrim").addEventListener("click", closeSheet);
 
+// ---- pemisah ribuan untuk input angka (id-ID: 10.000.000) ---------- //
+const groupDigits = (s) => {
+  const d = String(s == null ? "" : s).replace(/\D/g, "");
+  return d ? Number(d).toLocaleString("id-ID") : "";
+};
+function reformatMoney(el) {
+  const digitsBefore = el.value.slice(0, el.selectionStart).replace(/\D/g, "").length;
+  el.value = groupDigits(el.value);
+  let pos = 0, seen = 0;
+  while (pos < el.value.length && seen < digitsBefore) {
+    if (/\d/.test(el.value[pos])) seen++;
+    pos++;
+  }
+  try { el.setSelectionRange(pos, pos); } catch (_) {}
+}
+document.addEventListener("input", (e) => {
+  const el = e.target;
+  if (el && el.classList && el.classList.contains("money")) reformatMoney(el);
+});
+
 // ---- navigation ---------------------------------------------------- //
 function navHTML() {
   const item = (id, label, path) =>
@@ -228,7 +248,7 @@ function histRow(t) {
 }
 function editSheet(t) {
   $("sheetBody").innerHTML = `<h3>Ubah transaksi</h3>
-    <label class="fl">Nominal (Rp)</label><input class="field" id="e-amt" inputmode="numeric" value="${t.amount}" />
+    <label class="fl">Nominal (Rp)</label><input class="field money" id="e-amt" inputmode="numeric" value="${groupDigits(t.amount)}" />
     <label class="fl">Kategori</label><input class="field" id="e-cat" value="${esc(t.category || "")}" />
     <label class="fl">Catatan</label><input class="field" id="e-note" value="${esc(t.note || "")}" />
     <div class="btns"><button class="btn ghost" id="e-cancel">Batal</button><button class="btn primary" id="e-save">Simpan</button></div>`;
@@ -308,7 +328,7 @@ function editAccountSheet(a) {
     <label class="fl">Nama akun</label><input class="field" id="ea-name" value="${esc(a.name)}" />
     <label class="fl">Tipe</label>
     <select class="field" id="ea-type">${types.map(([v, l]) => `<option value="${v}" ${a.type === v ? "selected" : ""}>${l}</option>`).join("")}</select>
-    <label class="fl">Saldo awal (Rp)</label><input class="field" id="ea-bal" inputmode="numeric" value="${a.starting_balance != null ? a.starting_balance : a.balance}" />
+    <label class="fl">Saldo awal (Rp)</label><input class="field money" id="ea-bal" inputmode="numeric" value="${groupDigits(a.starting_balance != null ? a.starting_balance : a.balance)}" />
     <div class="btns"><button class="btn ghost" id="ea-cancel">Batal</button><button class="btn primary" id="ea-save">Simpan</button></div>`;
   openSheet();
   $("ea-cancel").addEventListener("click", closeSheet);
@@ -380,7 +400,7 @@ function showAddAccount() {
       <option value="ewallet">E-wallet</option><option value="credit_card">Kartu kredit</option>
     </select>
     <label class="fl">Saldo awal (Rp)</label>
-    <input class="field" id="a-bal" inputmode="numeric" value="0" />
+    <input class="field money" id="a-bal" inputmode="numeric" value="0" />
     <div class="btns"><button class="btn ghost" id="a-cancel">Batal</button><button class="btn primary" id="a-save">Simpan</button></div>`;
   openSheet();
   $("a-cancel").addEventListener("click", closeSheet);
@@ -440,9 +460,9 @@ function showSettings(cfg) {
   const sl = cfg.spending_limit || {}, it = cfg.income_target || {};
   $("sheetBody").innerHTML = `<h3>Target &amp; Batas</h3>
     <label class="fl">Batas pengeluaran — periode</label>${periodSelect("s-sl-p", sl.period)}
-    <label class="fl">Batas pengeluaran (Rp)</label><input class="field" id="s-sl-a" inputmode="numeric" value="${sl.amount || ""}" />
+    <label class="fl">Batas pengeluaran (Rp)</label><input class="field money" id="s-sl-a" inputmode="numeric" value="${groupDigits(sl.amount || "")}" />
     <label class="fl">Target pemasukan — periode</label>${periodSelect("s-it-p", it.period)}
-    <label class="fl">Target pemasukan (Rp)</label><input class="field" id="s-it-a" inputmode="numeric" value="${it.amount || ""}" />
+    <label class="fl">Target pemasukan (Rp)</label><input class="field money" id="s-it-a" inputmode="numeric" value="${groupDigits(it.amount || "")}" />
     <label class="fl">Ambang alert (%)</label><input class="field" id="s-th" inputmode="numeric" value="${cfg.alert_threshold || 90}" />
     <label class="fl">Email untuk alert</label><input class="field" id="s-email" value="${esc(cfg.alert_email || "")}" placeholder="nama@email.com" />
     <div class="btns"><button class="btn ghost" id="s-cancel">Batal</button><button class="btn primary" id="s-save">Simpan</button></div>`;
@@ -462,7 +482,7 @@ function showSettings(cfg) {
 function showAddCategory(cfg) {
   $("sheetBody").innerHTML = `<h3>Anggaran kategori</h3>
     <label class="fl">Kategori</label><input class="field" id="c-name" placeholder="mis. Transport" />
-    <label class="fl">Batas per bulan (Rp)</label><input class="field" id="c-amt" inputmode="numeric" />
+    <label class="fl">Batas per bulan (Rp)</label><input class="field money" id="c-amt" inputmode="numeric" />
     <div class="btns"><button class="btn ghost" id="c-cancel">Batal</button><button class="btn primary" id="c-save">Simpan</button></div>`;
   openSheet();
   $("c-cancel").addEventListener("click", closeSheet);
@@ -568,7 +588,7 @@ function showConfirm(d) {
         <h4>Draft Transaksi (AI Extracted)</h4>
         ${dupBanner}
         <div class="draft-row"><span class="k">Jenis</span><div class="ctrl"><div class="seg2" id="seg">${types.map((t) => `<span data-t="${t}" class="${draft.type === t ? "on" : ""}">${TYPE_LABEL[t]}</span>`).join("")}</div></div></div>
-        <div class="draft-row"><span class="k">Nominal</span><div class="ctrl"><div class="num-wrap"><input id="d-amt" inputmode="numeric" value="${draft.amount || ""}" placeholder="0" /><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h3M8 18h3"/></svg></span></div></div></div>
+        <div class="draft-row"><span class="k">Nominal</span><div class="ctrl"><div class="num-wrap"><input id="d-amt" class="money" inputmode="numeric" value="${groupDigits(draft.amount || "")}" placeholder="0" /><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h3M8 18h3"/></svg></span></div></div></div>
         ${isTransfer() ? `
           <div class="draft-row"><span class="k">Dari akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-from">${accountOptions(draft.from_account_id)}</select>${CHEVRON}</div></div></div>
           <div class="draft-row"><span class="k">Ke akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-to">${accountOptions(draft.to_account_id)}</select>${CHEVRON}</div></div></div>
