@@ -1,5 +1,6 @@
-/* Service worker: cache app shell (offline-capable shell), network-first untuk /api. */
-const CACHE = "ck-shell-v1";
+/* Service worker: network-first untuk shell (selalu ambil terbaru saat online),
+   fallback ke cache saat offline. /api tidak di-cache. */
+const CACHE = "ck-shell-v2";
 const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (e) => {
@@ -15,10 +16,15 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  // API: selalu jaringan (data tak boleh basi); jangan cache.
-  if (url.pathname.startsWith("/api/")) return;
-  // Shell: cache-first, fallback jaringan; navigasi fallback ke index.
+  if (url.pathname.startsWith("/api/")) return; // data lewat jaringan, jangan cache
+  // Shell: network-first → selalu tampil versi terbaru; cache hanya untuk offline.
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).catch(() => caches.match("./index.html")))
+    fetch(e.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request).then((hit) => hit || caches.match("./index.html")))
   );
 });
