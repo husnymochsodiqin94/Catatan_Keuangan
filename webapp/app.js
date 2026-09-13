@@ -17,7 +17,9 @@ async function api(method, path, body) {
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   const res = await fetch(path, opt);
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401) { clearToken(); showAuth("login"); throw new Error("Sesi berakhir, silakan masuk"); }
+  // 401 hanya berarti "sesi berakhir" bila request memang membawa token.
+  // Saat login/daftar (tanpa token), tampilkan pesan asli dari server.
+  if (res.status === 401 && tok) { clearToken(); showAuth("login"); throw new Error("Sesi berakhir, silakan masuk"); }
   if (!res.ok) throw new Error(data.error || "Terjadi kesalahan");
   return data;
 }
