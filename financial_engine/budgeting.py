@@ -51,7 +51,7 @@ def evaluate(engine: FinancialEngine, config: Dict[str, Any],
     ref = ref or datetime.now()
     threshold = int(config.get("alert_threshold") or DEFAULT_THRESHOLD)
     out: Dict[str, Any] = {"spending_limit": None, "income_target": None,
-                           "categories": [], "alerts": []}
+                           "categories": [], "alerts": [], "safe_to_spend": None}
 
     sl = config.get("spending_limit") or {}
     if sl.get("amount"):
@@ -79,6 +79,20 @@ def evaluate(engine: FinancialEngine, config: Dict[str, Any],
             "period": it.get("period", "monthly"), "amount": amount,
             "achieved": achieved, "pct": _pct(achieved, amount),
         }
+
+    # Safe-to-Spend harian dinamis: sisa anggaran bulanan / sisa hari bulan ini.
+    days_in_month = calendar.monthrange(ref.year, ref.month)[1]
+    days_left = days_in_month - ref.day + 1  # termasuk hari ini
+    sl_month = sl if sl.get("amount") and sl.get("period", "monthly") == "monthly" else None
+    if sl_month and out["spending_limit"] is not None and days_left > 0:
+        remaining = max(0, out["spending_limit"]["remaining"])
+        per_day = remaining // days_left
+        out["safe_to_spend"] = {
+            "per_day": per_day, "remaining": remaining, "days_left": days_left,
+            "basis": "monthly_limit",
+        }
+        if out["spending_limit"]["over"]:
+            out["safe_to_spend"]["per_day"] = 0
 
     s, e = period_bounds("monthly", ref)
     by = engine.expense_by_category(s, e)

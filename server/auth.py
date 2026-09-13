@@ -32,3 +32,16 @@ def verify_password(password: str, stored: str) -> bool:
 
 def new_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def new_otp() -> str:
+    """Kode OTP 6 digit untuk 2FA email."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hash_otp(code: str) -> str:
+    return hashlib.sha256((code or "").encode("utf-8")).hexdigest()
+
+
+def verify_otp(code: str, stored_hash: str) -> bool:
+    return hmac.compare_digest(hash_otp(code), stored_hash or "")

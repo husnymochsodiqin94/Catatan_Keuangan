@@ -26,7 +26,8 @@ _CONTENT_TYPES = {
     ".webmanifest": "application/manifest+json", ".json": "application/json",
     ".png": "image/png", ".ico": "image/x-icon",
 }
-_PUBLIC = {"/api/health", "/api/categories", "/api/auth/register", "/api/auth/login"}
+_PUBLIC = {"/api/health", "/api/categories", "/api/auth/register",
+           "/api/auth/login", "/api/auth/2fa/verify"}
 
 
 def _int(qs: dict, key: str):
@@ -121,6 +122,9 @@ class Handler(BaseHTTPRequestHandler):
                     _STORAGE, data.get("email"), data.get("password"), data.get("display_name", "")), 201)
             if path == "/api/auth/login":
                 return self._json(service.login(_STORAGE, data.get("email"), data.get("password")))
+            if path == "/api/auth/2fa/verify":
+                return self._json(service.verify_twofa(
+                    _STORAGE, data.get("email"), data.get("code")))
             uid = self._require_user(path)
             if uid is None:
                 return

@@ -1,7 +1,7 @@
 """Tests server: auth multi-user + Storage + service (sambungan ke Engine)."""
 
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from financial_engine import ValidationError
 from server import service
@@ -54,6 +54,25 @@ class TestAuth(unittest.TestCase):
         self.assertEqual(self.s.get_session_user(reg["token"]), reg["user"]["id"])
         service.logout(self.s, reg["token"])
         self.assertIsNone(self.s.get_session_user(reg["token"]))
+
+    def test_2fa_setelah_14_hari(self):
+        reg = service.register(self.s, "a@b.com", "secret1")
+        uid = reg["user"]["id"]
+        # dalam 14 hari: langsung dapat token
+        self.assertIn("token", service.login(self.s, "a@b.com", "secret1"))
+        # >14 hari: minta 2FA (tanpa token), kode dikirim (dev_code karena SMTP off)
+        self.s.set_last_2fa(uid, (datetime.now() - timedelta(days=15)).isoformat())
+        chal = service.login(self.s, "a@b.com", "secret1")
+        self.assertTrue(chal.get("twofa_required"))
+        self.assertNotIn("token", chal)
+        self.assertEqual(len(chal["dev_code"]), 6)
+        # kode salah ditolak
+        with self.assertRaises(AuthError):
+            service.verify_twofa(self.s, "a@b.com", "000000")
+        # kode benar -> token, dan login berikutnya kembali fresh
+        out = service.verify_twofa(self.s, "a@b.com", chal["dev_code"])
+        self.assertIn("token", out)
+        self.assertIn("token", service.login(self.s, "a@b.com", "secret1"))
 
 
 class TestIsolation(BaseCase):
@@ -174,6 +193,34 @@ class TestCommitAndPersist(BaseCase):
             "occurred_at": datetime(2026, 9, 12, 10, 0).isoformat()})
         service.delete_transaction(self.s, self.uid, res["transaction"]["id"], 2026, 9)
         self.assertEqual(len(service.list_transactions(self.s, self.uid)), 0)
+
+
+class TestDuplicateProtection(BaseCase):
+    def test_duplikat_diminta_konfirmasi_lalu_boleh(self):
+        base = datetime(2026, 9, 13, 10, 0)
+        f = {"type": "expense", "amount": 35_000, "account_id": self.bca["id"],
+             "category": "Makanan & Minuman", "occurred_at": base.isoformat()}
+        self.assertIn("transaction", service.create_transaction(self.s, self.uid, f))
+        # identik dalam <=5 menit -> ditandai duplikat, belum tersimpan
+        f2 = {**f, "occurred_at": (base + timedelta(minutes=2)).isoformat()}
+        res = service.create_transaction(self.s, self.uid, f2)
+        self.assertIn("duplicate", res)
+        self.assertEqual(len(service.list_transactions(self.s, self.uid)), 1)
+        # dikonfirmasi -> tersimpan
+        res2 = service.create_transaction(self.s, self.uid, {**f2, "allow_duplicate": True})
+        self.assertIn("transaction", res2)
+        self.assertEqual(len(service.list_transactions(self.s, self.uid)), 2)
+
+    def test_beda_kategori_bukan_duplikat(self):
+        base = datetime(2026, 9, 13, 10, 0)
+        service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 35_000, "account_id": self.bca["id"],
+            "category": "Makanan & Minuman", "occurred_at": base.isoformat()})
+        res = service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 35_000, "account_id": self.bca["id"],
+            "category": "Transportasi & Mobilitas",
+            "occurred_at": (base + timedelta(minutes=1)).isoformat()})
+        self.assertIn("transaction", res)
 
 
 class TestSettingsBudgetEdit(BaseCase):

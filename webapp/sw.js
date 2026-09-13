@@ -1,6 +1,6 @@
 /* Service worker: network-first untuk shell (selalu ambil terbaru saat online),
    fallback ke cache saat offline. /api tidak di-cache. */
-const CACHE = "ck-shell-v5";
+const CACHE = "ck-shell-v6";
 const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (e) => {

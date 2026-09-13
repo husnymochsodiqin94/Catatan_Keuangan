@@ -67,6 +67,19 @@ class TestEvaluate(unittest.TestCase):
         out = evaluate(self.e, {}, self.ref)
         self.assertEqual(out["alerts"], [])
         self.assertIsNone(out["spending_limit"])
+        self.assertIsNone(out["safe_to_spend"])
+
+    def test_safe_to_spend_harian(self):
+        # batas 3jt, terpakai 2.7jt -> sisa 300rb; ref 15 Sep (bulan 30 hari) -> 16 hari tersisa
+        out = evaluate(self.e, {"spending_limit": {"period": "monthly", "amount": 3_000_000}}, self.ref)
+        sf = out["safe_to_spend"]
+        self.assertEqual(sf["remaining"], 300_000)
+        self.assertEqual(sf["days_left"], 16)   # 30 - 15 + 1
+        self.assertEqual(sf["per_day"], 300_000 // 16)
+
+    def test_safe_to_spend_nol_saat_over(self):
+        out = evaluate(self.e, {"spending_limit": {"period": "monthly", "amount": 2_000_000}}, self.ref)
+        self.assertEqual(out["safe_to_spend"]["per_day"], 0)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from financial_engine import (
@@ -32,9 +32,17 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
 }
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+TWOFA_INTERVAL_DAYS = 14      # verifikasi email diminta paling sering per 14 hari
+TWOFA_CODE_TTL_MIN = 10       # kode OTP berlaku 10 menit
+DUPLICATE_WINDOW_SEC = 300    # proteksi duplikat: 5 menit
+
 
 class AuthError(ValueError):
     """Kredensial/registrasi tidak valid."""
+
+
+def _rp(n: int) -> str:
+    return "Rp" + format(int(n or 0), ",d").replace(",", ".")
 
 
 # --------------------------------------------------------------------- #
@@ -54,15 +62,89 @@ def register(storage: Storage, email: str, password: str,
     if storage.get_user_by_email(email):
         raise AuthError("email sudah terdaftar")
     user = storage.create_user(email, auth.hash_password(password), (display_name or "").strip())
+    # baru daftar = dianggap terverifikasi, tak langsung diminta 2FA
+    storage.set_last_2fa(user["id"], datetime.now().isoformat(timespec="seconds"))
     token = storage.create_session(user["id"])
     return {"token": token, "user": _public_user(user)}
 
 
-def login(storage: Storage, email: str, password: str) -> Dict[str, Any]:
+def _twofa_fresh(user: Dict[str, Any], now: datetime) -> bool:
+    last = user.get("last_2fa_at")
+    if not last:
+        return False
+    try:
+        return (now - datetime.fromisoformat(last)) <= timedelta(days=TWOFA_INTERVAL_DAYS)
+    except (TypeError, ValueError):
+        return False
+
+
+def _mask_email(email: str) -> str:
+    name, _, dom = email.partition("@")
+    head = name[:2] if len(name) > 2 else name[:1]
+    return f"{head}{'*' * max(1, len(name) - len(head))}@{dom}"
+
+
+def _issue_twofa(storage: Storage, user: Dict[str, Any], now: datetime) -> Dict[str, Any]:
+    """Buat & kirim kode OTP; kembalikan payload 'twofa_required' (tanpa token)."""
+    code = auth.new_otp()
+    expires = (now + timedelta(minutes=TWOFA_CODE_TTL_MIN)).isoformat(timespec="seconds")
+    storage.set_twofa(user["id"], auth.hash_otp(code), expires)
+    out: Dict[str, Any] = {
+        "twofa_required": True, "email": _mask_email(user["email"]),
+        "expires_in_min": TWOFA_CODE_TTL_MIN,
+    }
+    subject = "Kode Verifikasi Masuk — AI Financial Assistant"
+    body = (f"Kode verifikasi masuk Anda: {code}\n"
+            f"Berlaku {TWOFA_CODE_TTL_MIN} menit. Abaikan bila ini bukan Anda.")
+    if email_alert.is_configured():
+        try:
+            email_alert.send_email(user["email"], subject, body)
+            out["email_sent"] = True
+        except Exception:
+            out["email_sent"] = False
+            out["dev_code"] = code  # gagal kirim -> fallback tampilkan (lokal)
+    else:
+        # SMTP belum dikonfigurasi (mis. lokal): tampilkan kode agar tetap bisa masuk
+        print(f"[2FA] kode untuk {user['email']}: {code}")
+        out["email_sent"] = False
+        out["dev_code"] = code
+    return out
+
+
+def login(storage: Storage, email: str, password: str,
+          now: Optional[datetime] = None) -> Dict[str, Any]:
+    now = now or datetime.now()
     email = (email or "").strip().lower()
     user = storage.get_user_by_email(email)
     if not user or not auth.verify_password(password or "", user["password_hash"]):
         raise AuthError("email atau kata sandi salah")
+    if not _twofa_fresh(user, now):
+        return _issue_twofa(storage, user, now)
+    token = storage.create_session(user["id"])
+    return {"token": token, "user": _public_user(user)}
+
+
+def verify_twofa(storage: Storage, email: str, code: str,
+                 now: Optional[datetime] = None) -> Dict[str, Any]:
+    now = now or datetime.now()
+    email = (email or "").strip().lower()
+    user = storage.get_user_by_email(email)
+    if not user:
+        raise AuthError("pengguna tidak ditemukan")
+    rec = storage.get_twofa(user["id"])
+    if not rec:
+        raise AuthError("kode tidak ditemukan, silakan masuk ulang")
+    try:
+        expired = datetime.fromisoformat(rec["expires_at"]) < now
+    except (TypeError, ValueError):
+        expired = True
+    if expired:
+        storage.delete_twofa(user["id"])
+        raise AuthError("kode kedaluwarsa, silakan masuk ulang")
+    if not auth.verify_otp((code or "").strip(), rec["code_hash"]):
+        raise AuthError("kode salah")
+    storage.delete_twofa(user["id"])
+    storage.set_last_2fa(user["id"], now.isoformat(timespec="seconds"))
     token = storage.create_session(user["id"])
     return {"token": token, "user": _public_user(user)}
 
@@ -228,6 +310,20 @@ def create_transaction(storage: Storage, user_id: str, f: Dict[str, Any],
                              occurred_at=occurred_at, note=note, source="app")
     else:
         raise ValidationError(f"tipe transaksi tidak didukung: {typ!r}")
+
+    # Proteksi duplikat: nominal+akun sama & kategori identik dalam <=5 menit.
+    if not f.get("allow_duplicate"):
+        dups = [d for d in e.find_duplicates(tx, DUPLICATE_WINDOW_SEC)
+                if (d.category or None) == (tx.category or None)]
+        if dups:
+            recent = max(dups, key=lambda d: d.occurred_at)
+            return {"duplicate": {
+                "amount": tx.amount, "category": tx.category,
+                "occurred_at": recent.occurred_at.isoformat(),
+                "message": (f"Transaksi {_rp(tx.amount)}"
+                            f"{' — ' + tx.category if tx.category else ''} baru saja dicatat. "
+                            "Apakah ini transaksi baru?"),
+            }}
 
     row = storage.add_transaction(user_id, {
         "type": tx.type.value, "amount": tx.amount,

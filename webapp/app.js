@@ -49,6 +49,7 @@ function showAuth(mode) {
       const body = login ? { email, password: pass }
         : { email, password: pass, display_name: ($("au-name").value || "").trim() };
       const out = await api("POST", login ? "/api/auth/login" : "/api/auth/register", body);
+      if (out.twofa_required) return showTwoFA(email, out);
       setToken(out.token); $("fab").hidden = false; go("home");
     } catch (e) { toast(e.message, true); }
   };
@@ -57,6 +58,35 @@ function showAuth(mode) {
   $("au-switch").addEventListener("click", () => showAuth(login ? "register" : "login"));
   const fg = $("au-forgot"); if (fg) fg.addEventListener("click", () => toast("Fitur reset kata sandi segera hadir"));
   $("view").querySelectorAll("[data-soon]").forEach((el) => el.addEventListener("click", () => toast("Fitur ini segera hadir")));
+}
+
+function showTwoFA(email, info) {
+  VIEW = "__auth";
+  $("topbar").innerHTML = ""; $("nav").innerHTML = ""; $("fab").hidden = true;
+  const sent = info.email_sent
+    ? `Kami mengirim kode 6 digit ke <b>${esc(info.email || email)}</b>.`
+    : `SMTP belum dikonfigurasi — kode dev ditampilkan di bawah.`;
+  $("view").innerHTML = `<div class="auth">
+    <div class="logo">${MIC_SVG}</div>
+    <h1>Verifikasi Masuk</h1>
+    <p class="muted">${sent} Berlaku ${info.expires_in_min || 10} menit. Diminta setiap 14 hari.</p>
+    ${info.dev_code ? `<div class="banner">Kode dev: <b>${esc(info.dev_code)}</b></div>` : ""}
+    <label class="fl">Kode Verifikasi</label>
+    <input class="field" id="tf-code" inputmode="numeric" maxlength="6" placeholder="6 digit" value="${info.dev_code ? esc(info.dev_code) : ""}" />
+    <button class="btn primary" id="tf-go" style="margin-top:16px">VERIFIKASI</button>
+    <div style="text-align:center;margin-top:16px" class="muted"><a id="tf-back" style="cursor:pointer">Kembali</a></div>
+  </div>`;
+  const submit = async () => {
+    const code = ($("tf-code").value || "").trim();
+    if (code.length < 6) return toast("Masukkan 6 digit kode", true);
+    try {
+      const out = await api("POST", "/api/auth/2fa/verify", { email, code });
+      setToken(out.token); $("fab").hidden = false; go("home");
+    } catch (e) { toast(e.message, true); }
+  };
+  $("tf-go").addEventListener("click", submit);
+  $("tf-code").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+  $("tf-back").addEventListener("click", () => showAuth("login"));
 }
 
 let ACCOUNTS = [];
@@ -434,6 +464,13 @@ async function renderAnggaran() {
   const th = cfg.alert_threshold || 90;
   const barColor = (pct, over) => over ? "var(--out)" : (pct >= th ? "#f59e0b" : "var(--accent)");
   let html = "";
+  if (st.safe_to_spend) {
+    const sf = st.safe_to_spend;
+    html += `<div class="saldo-card" style="margin-bottom:12px">
+      <div class="t">Aman dibelanjakan / hari</div>
+      <div class="big">${rp(sf.per_day)}</div>
+      <div class="muted" style="font-size:12px">Sisa anggaran ${rp(sf.remaining)} untuk ${sf.days_left} hari</div></div>`;
+  }
   if (st.spending_limit) {
     const s = st.spending_limit;
     html += `<div class="card wide"><div class="label">Batas pengeluaran (${PERIODS[s.period] || s.period})</div>
@@ -635,8 +672,14 @@ function showConfirm(d) {
     if (draft.type === "transfer") { f.from_account_id = draft.from_account_id; f.to_account_id = draft.to_account_id; }
     else { f.account_id = draft.account_id; f.category = draft.category || null; }
     if (!f.amount || f.amount <= 0) return toast("Nominal harus > 0", true);
-    try { await api("POST", "/api/transactions", f); closeSheet(); toast("Tercatat ✓"); go("home"); }
-    catch (e) { toast(e.message, true); }
+    try {
+      let res = await api("POST", "/api/transactions", f);
+      if (res.duplicate) {
+        if (!confirm(res.duplicate.message + "\n\n[OK] = Ya, catat lagi   [Batal] = Batalkan")) return;
+        res = await api("POST", "/api/transactions", { ...f, allow_duplicate: true });
+      }
+      closeSheet(); toast("Tercatat ✓"); go("home");
+    } catch (e) { toast(e.message, true); }
   }
 }
 

@@ -18,11 +18,18 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     display_name TEXT,
+    last_2fa_at TEXT,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS twofa_codes (
+    user_id TEXT PRIMARY KEY,
+    code_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS accounts (
@@ -82,6 +89,7 @@ class Storage:
         wanted = {
             "accounts": [("user_id", "TEXT"), ("archived", "INTEGER NOT NULL DEFAULT 0")],
             "transactions": [("user_id", "TEXT")],
+            "users": [("last_2fa_at", "TEXT")],
         }
         for table, columns in wanted.items():
             existing = {r["name"] for r in self._db.execute(f"PRAGMA table_info({table})")}
@@ -129,6 +137,28 @@ class Storage:
 
     def delete_session(self, token: str) -> None:
         self._db.execute("DELETE FROM sessions WHERE token=?", (token,))
+        self._db.commit()
+
+    # ---- 2FA (verifikasi email berkala) ---- #
+    def set_last_2fa(self, user_id: str, ts: str) -> None:
+        self._db.execute("UPDATE users SET last_2fa_at=? WHERE id=?", (ts, user_id))
+        self._db.commit()
+
+    def set_twofa(self, user_id: str, code_hash: str, expires_at: str) -> None:
+        self._db.execute(
+            "INSERT INTO twofa_codes(user_id,code_hash,expires_at,created_at) VALUES(?,?,?,?) "
+            "ON CONFLICT(user_id) DO UPDATE SET code_hash=excluded.code_hash, "
+            "expires_at=excluded.expires_at, created_at=excluded.created_at",
+            (user_id, code_hash, expires_at, datetime.now().isoformat(timespec="seconds")))
+        self._db.commit()
+
+    def get_twofa(self, user_id: str) -> Optional[Dict[str, Any]]:
+        row = self._db.execute(
+            "SELECT * FROM twofa_codes WHERE user_id=?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+    def delete_twofa(self, user_id: str) -> None:
+        self._db.execute("DELETE FROM twofa_codes WHERE user_id=?", (user_id,))
         self._db.commit()
 
     # ------------------------------------------------------------------ #
