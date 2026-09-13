@@ -128,6 +128,33 @@ label.fl{display:block;font-size:12px;color:var(--muted);margin:10px 2px 5px;fon
 .alert-banner.over{background:#fdecec;border-color:#f6c9c9;color:var(--out)}
 .alert-banner b{display:block}
 .alert-banner div div{font-size:12px;margin-top:1px}
+/* ---- Dashboard gaya mockup ---- */
+.hdr-icons{display:flex;gap:8px}
+.hicon{width:38px;height:38px;border-radius:11px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+.saldo-card{background:#fff;border:1px solid #cdeef2;border-radius:20px;padding:18px;text-align:center;box-shadow:0 8px 26px rgba(6,182,212,.14)}
+.saldo-card .t{font-size:13px;color:var(--muted)}
+.saldo-card .big{font-size:32px;font-weight:800;color:var(--ai);letter-spacing:-.5px;margin:4px 0 8px}
+.saldo-card .accs-inline{display:flex;gap:8px 18px;justify-content:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.saldo-card .accs-inline b{color:var(--ink);font-weight:700}
+.spend-card{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin-top:14px}
+.mini-chart{display:flex;align-items:flex-end;gap:5px;height:54px;flex:none}
+.mini-chart i{width:7px;height:20%;border-radius:3px;background:var(--ai);opacity:.85}
+.mini-chart i:last-child{background:var(--accent);opacity:1}
+.spend-right{flex:1;min-width:0}
+.spend-right .lbl{font-size:13px;color:var(--muted)}
+.spend-right .amt{font-size:22px;font-weight:800;margin-top:2px}
+.tx-card{display:flex;align-items:center;gap:13px;padding:12px 2px;border-bottom:1px solid #eef0f3}
+.tx-card:last-child{border-bottom:none}
+.tx-av{width:44px;height:44px;border-radius:50%;background:rgba(6,182,212,.12);color:var(--ai);display:flex;align-items:center;justify-content:center;flex:none}
+.tx-card .grow{flex:1;min-width:0}
+.tx-card .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-card .dt{font-size:12px;color:var(--muted);margin-top:1px}
+.tx-card .right{text-align:right;white-space:nowrap}
+.tx-card .amt2{font-weight:700;font-size:14px}
+.tx-card .amt2.in{color:var(--in)}.tx-card .amt2.out{color:var(--out)}.tx-card .amt2.neu{color:var(--muted)}
+.tx-card .acc{font-size:11px;color:var(--muted);margin-top:1px}
+.home-hint{text-align:center;color:var(--muted);font-size:12px;margin:18px 0 2px}
+.home-hint b{color:var(--ai)}
 /* ---- Desktop / laptop (sidebar) ---- */
 @media(min-width:860px){
   .app{max-width:1000px;display:grid;grid-template-columns:220px 1fr;grid-template-areas:"nav top" "nav view";

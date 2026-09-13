@@ -103,41 +103,66 @@ async function render() {
 }
 
 // ---- HOME ---------------------------------------------------------- //
+const GEAR_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.6 1.6 1.6 0 01-3 0 1.6 1.6 0 00-2.7-.6l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 004 15a1.6 1.6 0 00-1.5-1H2.4a2 2 0 010-4h.1A1.6 1.6 0 004 9a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6 1.6 1.6 0 0110.5 3a1.6 1.6 0 013 0 1.6 1.6 0 002.7.6l.1-.1a2 2 0 112.8 2.8l-.1.1A1.6 1.6 0 0020 9a1.6 1.6 0 001.5 1h.1a2 2 0 010 4h-.1a1.6 1.6 0 00-1.1 1z"/></svg>';
+const BELL_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
+function categoryIcon(cat, type) {
+  const c = (cat || "").toLowerCase();
+  const svg = (p) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>`;
+  if (type === "income" || type === "refund" || /gaji|bonus|thr/.test(c)) return svg('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>');
+  if (type === "transfer") return svg('<path d="M7 7h11l-3-3M17 17H6l3 3"/>');
+  if (/kopi|makan|minum|food|jajan/.test(c)) return svg('<path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4z"/>');
+  if (/transport|bensin|mrt|grab|gojek|ojek|parkir|bus/.test(c)) return svg('<path d="M3 12h18"/><path d="M5 12V7a2 2 0 012-2h10a2 2 0 012 2v5"/><circle cx="7.5" cy="16.5" r="1.5"/><circle cx="16.5" cy="16.5" r="1.5"/>');
+  if (/belanja|indomaret|super|pasar/.test(c)) return svg('<path d="M6 2l1.5 4h9L18 2"/><path d="M4 6h16l-1.5 12a2 2 0 01-2 2H7.5a2 2 0 01-2-2z"/>');
+  if (/tagihan|listrik|pulsa|air|internet/.test(c)) return svg('<path d="M4 4h16v16l-3-2-3 2-3-2-3 2z"/>');
+  return svg('<circle cx="12" cy="12" r="9"/><path d="M9 12h6"/>');
+}
+function txCard(t) {
+  const isIn = t.type === "income" || t.type === "refund", isTf = t.type === "transfer";
+  const cls = isIn ? "in" : (isTf ? "neu" : "out");
+  const sign = isIn ? "+" : (isTf ? "" : "−");
+  const label = esc(t.category || t.note || TYPE_LABEL[t.type] || t.type);
+  return `<div class="tx-card"><div class="tx-av">${categoryIcon(t.category, t.type)}</div>
+    <div class="grow"><div class="nm">${label}</div><div class="dt">${esc(t.date || "")}</div></div>
+    <div class="right"><div class="amt2 ${cls}">${sign}${rp(t.amount)}</div><div class="acc">${esc(t.account || "")}</div></div></div>`;
+}
 async function renderHome() {
   const [sum, accts, bud] = await Promise.all([
     api("GET", "/api/summary"), api("GET", "/api/accounts"), api("GET", "/api/budget").catch(() => ({ alerts: [] })),
   ]);
   ACCOUNTS = accts;
-  $("topbar").innerHTML = `<h1>Beranda</h1><span class="period">Bulan Ini</span>`;
+  $("topbar").innerHTML = `<h1>Beranda</h1>
+    <span class="hdr-icons"><span class="hicon" id="h-gear" title="Anggaran">${GEAR_SVG}</span><span class="hicon" id="h-bell" title="Notifikasi">${BELL_SVG}</span></span>`;
   const hasData = sum.income || sum.expense || (sum.recent && sum.recent.length) || accts.some((a) => a.balance);
   if (!hasData && accts.length === 0) return renderOnboarding();
 
   const cats = sum.expense_by_category || [];
-  const max = cats.reduce((m, c) => Math.max(m, c.amount), 0) || 1;
-  const ncf = sum.net_cash_flow || 0;
+  const cmax = cats.reduce((m, c) => Math.max(m, c.amount), 0) || 1;
+  const topCat = cats[0] ? cats[0].category : null;
   const alert = (bud.alerts || [])[0];
   const banner = alert ? `<div class="alert-banner ${alert.level === "over" ? "over" : ""}">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
     <div><b>${esc(alert.title)}</b><div>${esc(alert.message)}</div></div></div>` : "";
-  const topCat = cats[0] ? cats[0].category : null;
-  const chips = accts.filter((a) => a.type !== "credit_card").slice(0, 3)
-    .map((a) => `<div class="bchip"><div class="n">${esc(a.name)}</div><div class="v">${rp(a.balance)}</div></div>`).join("");
+  const accInline = accts.filter((a) => a.type !== "credit_card").slice(0, 3)
+    .map((a) => `<span><b>${rp(a.balance)}</b> (${esc(a.name)})</span>`).join("");
+  const barData = cats.length ? cats.slice(0, 7) : [{ amount: 0 }, { amount: 0 }, { amount: 0 }];
+  const bars = barData.map((c) => `<i style="height:${Math.max(14, Math.round((c.amount || 0) / cmax * 100))}%"></i>`).join("");
   $("view").innerHTML = banner + `
-    <div class="card hero balance">
-      <div class="label">Total Saldo</div><div class="value">${rp(sum.total_balance)}</div>
-      ${chips ? `<div class="bchips">${chips}</div>` : ""}
+    <div class="saldo-card">
+      <div class="t">Total Saldo</div>
+      <div class="big">${rp(sum.total_balance)}</div>
+      ${accInline ? `<div class="accs-inline">${accInline}</div>` : ""}
     </div>
-    <div class="cards">
-      <div class="card"><div class="label">Masuk (bln ini)</div><div class="value in">+${rp(sum.income)}</div></div>
-      <div class="card"><div class="label">Keluar (bln ini)</div><div class="value out">−${rp(sum.expense)}</div>
-        ${topCat ? `<div class="muted" style="font-size:11px;margin-top:3px">Terbesar: ${esc(topCat)}</div>` : ""}</div>
-      <div class="card wide"><div class="label">Arus Kas Bersih (bln ini)</div><div class="value ${ncf < 0 ? "out" : "in"}">${ncf < 0 ? "−" : "+"}${rp(ncf)}</div></div>
+    <div class="spend-card">
+      <div class="mini-chart">${bars}</div>
+      <div class="spend-right"><div class="lbl">Pengeluaran Bulan Ini</div><div class="amt">${rp(sum.expense)}</div>
+        ${topCat ? `<div class="muted" style="font-size:12px;margin-top:2px">Terbesar: ${esc(topCat)}</div>` : ""}</div>
     </div>
-    ${cats.length ? `<div class="sec">Pengeluaran per kategori</div>${cats.map((c) => `
-      <div class="bar-row"><div class="bar-top"><span>${esc(c.category)}</span><span>${rp(c.amount)}</span></div>
-      <div class="bar"><i style="width:${Math.round(c.amount / max * 100)}%"></i></div></div>`).join("")}` : ""}
-    <div class="sec">Transaksi terbaru</div>
-    <div id="recent">${(sum.recent || []).map(txRow).join("") || '<p class="muted">Belum ada transaksi.</p>'}</div>`;
+    <div class="sec">Transaksi Terakhir</div>
+    <div id="recent">${(sum.recent || []).map(txCard).join("") || '<p class="muted">Belum ada transaksi.</p>'}</div>
+    <div class="home-hint">Coba ucapkan: <b>"Beli kopi 35rb pakai BCA"</b></div>`;
+  const g = $("h-gear"); if (g) g.addEventListener("click", () => go("anggaran"));
+  const b = $("h-bell"); if (b) b.addEventListener("click", () =>
+    toast((bud.alerts && bud.alerts.length) ? bud.alerts[0].title : "Tidak ada notifikasi"));
 }
 
 function renderOnboarding() {
