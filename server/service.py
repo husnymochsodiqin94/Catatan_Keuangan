@@ -109,7 +109,8 @@ def list_accounts(storage: Storage, user_id: str) -> List[Dict[str, Any]]:
     e = build_engine(storage, user_id)
     return [
         {"id": a.id, "name": a.name, "type": a.type.value,
-         "balance": e.balance(a.id), "starting_balance": a.starting_balance}
+         "balance": e.balance(a.id), "starting_balance": a.starting_balance,
+         "archived": bool(a.archived)}
         for a in e.accounts()
     ]
 
@@ -142,17 +143,28 @@ def update_account(storage: Storage, user_id: str, acc_id: str,
         if not isinstance(sb, int) or isinstance(sb, bool):
             raise ValidationError("saldo awal harus integer")
         patch["starting_balance"] = sb
+    if "archived" in fields:
+        patch["archived"] = 1 if fields["archived"] else 0
     storage.update_account(user_id, acc_id, patch)
     e = build_engine(storage, user_id)
     a = storage.get_account(user_id, acc_id)
-    return {"id": a["id"], "name": a["name"], "type": a["type"], "balance": e.balance(acc_id)}
+    return {"id": a["id"], "name": a["name"], "type": a["type"],
+            "balance": e.balance(acc_id), "archived": bool(a["archived"])}
 
 
-def delete_account(storage: Storage, user_id: str, acc_id: str) -> Dict[str, Any]:
+def delete_account(storage: Storage, user_id: str, acc_id: str,
+                   move_to: Optional[str] = None) -> Dict[str, Any]:
     if not storage.get_account(user_id, acc_id):
         raise ValidationError("akun tidak ditemukan")
-    if storage.account_has_transactions(user_id, acc_id):
-        raise ValidationError("Akun masih punya transaksi — hapus/pindahkan transaksinya dulu.")
+    if move_to:
+        if move_to == acc_id:
+            raise ValidationError("akun tujuan harus berbeda")
+        if not storage.get_account(user_id, move_to):
+            raise ValidationError("akun tujuan tidak ditemukan")
+        storage.reassign_transactions(user_id, acc_id, move_to)
+    elif storage.account_has_transactions(user_id, acc_id):
+        raise ValidationError(
+            "Akun masih punya transaksi — pindahkan transaksinya dulu atau arsipkan.")
     storage.delete_account(user_id, acc_id)
     return {"ok": True}
 

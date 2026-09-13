@@ -65,6 +65,8 @@ label.fl{display:block;font-size:12px;color:var(--muted);margin:10px 2px 5px;fon
 .btn.primary{background:var(--accent);color:#fff}
 .btn.ghost{background:#eef0f3;color:var(--ink)}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
+.row.archived{opacity:.7}
+.row .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;background:#eef0f3;color:var(--muted);vertical-align:middle;margin-left:4px}
 .btns{display:flex;gap:10px;margin-top:14px}
 .btns .btn{flex:1}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}

@@ -104,6 +104,38 @@ class TestAccountEditDelete(BaseCase):
         with self.assertRaises(ValidationError):
             service.update_account(self.s, reg2["user"]["id"], self.bca["id"], {"name": "X"})
 
+    def test_arsipkan_akun_disembunyikan_dari_transaksi(self):
+        service.update_account(self.s, self.uid, self.mandiri["id"], {"archived": True})
+        accs = {a["name"]: a for a in service.list_accounts(self.s, self.uid)}
+        self.assertTrue(accs["Mandiri"]["archived"])
+        # akun terarsip tidak boleh dipakai transaksi baru
+        with self.assertRaises(ValidationError):
+            service.create_transaction(self.s, self.uid, {
+                "type": "expense", "amount": 10_000, "account_id": self.mandiri["id"]})
+        # bisa diaktifkan kembali
+        service.update_account(self.s, self.uid, self.mandiri["id"], {"archived": False})
+        accs = {a["name"]: a for a in service.list_accounts(self.s, self.uid)}
+        self.assertFalse(accs["Mandiri"]["archived"])
+
+    def test_pindahkan_transaksi_lalu_hapus(self):
+        service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 100_000, "account_id": self.bca["id"],
+            "occurred_at": datetime(2026, 9, 12, 10, 0).isoformat()})
+        # pindahkan transaksi BCA -> Mandiri lalu hapus BCA
+        service.delete_account(self.s, self.uid, self.bca["id"], move_to=self.mandiri["id"])
+        names = [a["name"] for a in service.list_accounts(self.s, self.uid)]
+        self.assertNotIn("BCA", names)
+        # transaksi kini membebani Mandiri (5jt awal → 4jt)
+        accs = {a["name"]: a for a in service.list_accounts(self.s, self.uid)}
+        self.assertEqual(accs["Mandiri"]["balance"], 900_000)
+        self.assertEqual(len(service.list_transactions(self.s, self.uid)), 1)
+
+    def test_pindahkan_ke_akun_tak_dikenal_ditolak(self):
+        service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 10_000, "account_id": self.bca["id"]})
+        with self.assertRaises(ValidationError):
+            service.delete_account(self.s, self.uid, self.bca["id"], move_to="acc_tidak_ada")
+
 
 class TestParse(BaseCase):
     def test_parse_resolve_akun(self):

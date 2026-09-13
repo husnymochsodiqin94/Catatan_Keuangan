@@ -145,7 +145,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "kesalahan server"}, 500)
 
     def do_DELETE(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path, qs = parsed.path, parse_qs(parsed.query)
         try:
             uid = self._require_user(path)
             if uid is None:
@@ -153,7 +154,9 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/transactions/"):
                 return self._json(service.delete_transaction(_STORAGE, uid, path[len("/api/transactions/"):]))
             if path.startswith("/api/accounts/"):
-                return self._json(service.delete_account(_STORAGE, uid, path[len("/api/accounts/"):]))
+                return self._json(service.delete_account(
+                    _STORAGE, uid, path[len("/api/accounts/"):],
+                    move_to=qs.get("move_to", [None])[0]))
             return self._json({"error": "not found"}, 404)
         except (ValidationError, ValueError) as exc:
             return self._json({"error": str(exc)}, 400)

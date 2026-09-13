@@ -164,6 +164,20 @@ class Storage:
             (user_id, acc_id, acc_id)).fetchone()
         return row is not None
 
+    def reassign_transactions(self, user_id: str, old_id: str, new_id: str) -> None:
+        """Pindahkan semua transaksi dari old_id ke new_id (milik user)."""
+        self._db.execute(
+            "UPDATE transactions SET from_account_id=? WHERE user_id=? AND from_account_id=?",
+            (new_id, user_id, old_id))
+        self._db.execute(
+            "UPDATE transactions SET to_account_id=? WHERE user_id=? AND to_account_id=?",
+            (new_id, user_id, old_id))
+        # transfer yang jadi 'ke diri sendiri' (from==to) tak bermakna -> soft delete
+        self._db.execute(
+            "UPDATE transactions SET deleted=1 WHERE user_id=? AND type='transfer' "
+            "AND from_account_id IS NOT NULL AND from_account_id=to_account_id", (user_id,))
+        self._db.commit()
+
     def delete_account(self, user_id: str, acc_id: str) -> bool:
         cur = self._db.execute(
             "DELETE FROM accounts WHERE id=? AND user_id=?", (acc_id, user_id))

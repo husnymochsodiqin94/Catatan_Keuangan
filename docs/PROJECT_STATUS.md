@@ -8,7 +8,7 @@ _Terakhir diperbarui: 2026-09-12_
 Berfungsi: capture (suara/teks) → parse → konfirmasi → simpan; dashboard; riwayat (search/filter/**edit**/hapus); **Anggaran** (batas pengeluaran & target pemasukan per hari/minggu/bulan, anggaran per kategori, status & alert); **banner alert** di Beranda; **auth token opsional** (`CATATAN_TOKEN`) & **alert email** (`SMTP_*`) untuk deploy; **layout desktop** (sidebar) responsif. Semua angka dari engine.
 
 **Cara jalankan:** `python3 -m server.app` → http://127.0.0.1:8000. Deploy & env: `docs/DEPLOY.md`.
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **78 test OK**.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **87 test OK**.
 
 ## Roadmap Fitur (dari masukan user, 2026-09-12)
 - **Sudah ada di engine (tinggal disambungkan ke UI):** transfer antar akun, e-wallet, kartu kredit/liabilitas (utang dasar).
@@ -48,7 +48,8 @@ Berfungsi: capture (suara/teks) → parse → konfirmasi → simpan; dashboard; 
 - [x] **Restyle PWA sesuai mockup (tema terang)**: font Inter, aksen emerald `#10B981` + cyan `#06B6D4`, kartu Total Saldo gradient + chips per-akun, kartu "Keluar + Terbesar", animasi waveform saat merekam. Service worker network-first agar update langsung tampil.
 - [x] **Autentikasi multi-user (email + password)**: `server/auth.py` (PBKDF2 stdlib), tabel `users`/`sessions`, data **terisolasi per user** (accounts/transactions/settings ber-`user_id`). Endpoint `/api/auth/register|login|logout|me`, sesi via token `X-Token`. Frontend: layar **Login/Daftar**, tombol **Keluar** di menu Akun.
 - [x] **Dashboard & Draft gaya mockup (tema terang)**: Beranda (kartu Total Saldo + rincian akun, kartu Pengeluaran + mini bar chart + Terbesar, transaksi beravatar, ikon gear/bell). Kartu **Draft Transaksi** dengan **dropdown Kategori & Akun**, tombol KONFIRMASI & SIMPAN.
-- [x] **Edit & Hapus Akun**: `PATCH/DELETE /api/accounts/{id}` (nama/tipe/saldo awal), guard menolak hapus akun yang masih punya transaksi & akun milik user lain. UI: tombol ubah/hapus di daftar Akun. **84 test OK**.
+- [x] **Edit & Hapus Akun**: `PATCH/DELETE /api/accounts/{id}` (nama/tipe/saldo awal), guard menolak hapus akun yang masih punya transaksi & akun milik user lain. UI: tombol ubah/hapus di daftar Akun.
+- [x] **Arsip & Pindah-lalu-hapus Akun**: (a) **Arsipkan** akun (`PATCH archived:true`) — disembunyikan dari dropdown transaksi & chip Beranda, tidak bisa dipakai transaksi baru (guard engine), tampil di bagian "Diarsipkan" dengan tombol Aktifkan kembali. (b) **Pindahkan transaksi lalu hapus** (`DELETE /api/accounts/{id}?move_to={targetId}`) — semua transaksi di-reassign ke akun tujuan (transfer yang jadi ke-diri-sendiri di-soft-delete) lalu akun dihapus. UI: sheet "Hapus / Arsipkan Akun" dengan pilihan Arsipkan, Pindahkan & Hapus (dropdown akun tujuan), atau Hapus permanen. Service worker `ck-shell-v3`. **87 test OK**.
 - [x] **Audit MVP** (`docs/AUDIT_REPORT.md`): financial accuracy, AI, security, performance, token/AI-cost. Defect diperbaiki: A1 splitter "hari lalu", A2 angka frasa waktu jadi nominal, P1 repeated processing di `net_worth`. Regresi `TestTemporalNotAmount` ditambahkan.
 
 ## Temuan Audit Terbuka (belum dikerjakan — bukan defect diam-diam)

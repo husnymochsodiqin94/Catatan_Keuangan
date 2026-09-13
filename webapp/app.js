@@ -142,7 +142,7 @@ async function renderHome() {
   const banner = alert ? `<div class="alert-banner ${alert.level === "over" ? "over" : ""}">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
     <div><b>${esc(alert.title)}</b><div>${esc(alert.message)}</div></div></div>` : "";
-  const accInline = accts.filter((a) => a.type !== "credit_card").slice(0, 3)
+  const accInline = accts.filter((a) => a.type !== "credit_card" && !a.archived).slice(0, 3)
     .map((a) => `<span><b>${rp(a.balance)}</b> (${esc(a.name)})</span>`).join("");
   const barData = cats.length ? cats.slice(0, 7) : [{ amount: 0 }, { amount: 0 }, { amount: 0 }];
   const bars = barData.map((c) => `<i style="height:${Math.max(14, Math.round((c.amount || 0) / cmax * 100))}%"></i>`).join("");
@@ -257,14 +257,18 @@ async function renderAccounts() {
     api("GET", "/api/accounts"), api("GET", "/api/auth/me").catch(() => null),
   ]);
   ACCOUNTS = accts;
-  const total = accts.filter((a) => a.type !== "credit_card").reduce((s, a) => s + a.balance, 0);
+  const active = accts.filter((a) => !a.archived);
+  const archived = accts.filter((a) => a.archived);
+  const total = active.filter((a) => a.type !== "credit_card").reduce((s, a) => s + a.balance, 0);
   $("view").innerHTML = `
     ${me ? `<div class="user-row"><div class="uav">${esc((me.display_name || me.email || "?")[0].toUpperCase())}</div>
       <div class="grow"><div class="nm">${esc(me.display_name || "")}</div><div class="sub">${esc(me.email || "")}</div></div>
       <button class="act-btn" id="logout">Keluar</button></div>` : ""}
     <div class="card hero balance"><div class="label">Total Saldo</div><div class="value">${rp(total)}</div></div>
     <div class="sec">Daftar Akun</div>
-    <div>${accts.map(acctRow).join("") || '<p class="muted">Belum ada akun.</p>'}</div>
+    <div>${active.map(acctRow).join("") || '<p class="muted">Belum ada akun.</p>'}</div>
+    ${archived.length ? `<div class="sec">Diarsipkan</div>
+      <div>${archived.map(acctRow).join("")}</div>` : ""}
     <button class="btn primary" id="add-acc" style="margin-top:14px">+ Tambah Akun</button>`;
   $("add-acc").addEventListener("click", showAddAccount);
   const lo = $("logout");
@@ -276,17 +280,27 @@ async function renderAccounts() {
     const a = ACCOUNTS.find((x) => x.id === b.dataset.editAcc); if (a) editAccountSheet(a);
   }));
   $("view").querySelectorAll("[data-del-acc]").forEach((b) => b.addEventListener("click", () => {
-    const a = ACCOUNTS.find((x) => x.id === b.dataset.delAcc); if (a) deleteAccount(a);
+    const a = ACCOUNTS.find((x) => x.id === b.dataset.delAcc); if (a) manageDeleteAccount(a);
+  }));
+  $("view").querySelectorAll("[data-unarch-acc]").forEach((b) => b.addEventListener("click", () => {
+    const a = ACCOUNTS.find((x) => x.id === b.dataset.unarchAcc); if (a) unarchiveAccount(a);
   }));
 }
 function acctRow(a) {
   const T = { bank: "Bank", cash: "Tunai", ewallet: "E-wallet", credit_card: "Kartu kredit" };
   const cls = a.type === "credit_card" ? "out" : "";
+  if (a.archived) {
+    return `<div class="row archived"><div class="ic">${esc((a.name[0] || "?").toUpperCase())}</div>
+      <div class="grow"><div class="nm">${esc(a.name)} <span class="tag">Diarsipkan</span></div><div class="sub">${T[a.type] || a.type}</div></div>
+      <span class="amt ${cls}">${rp(a.balance)}</span>
+      <button class="act" data-unarch-acc="${a.id}" title="Aktifkan kembali"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg></button>
+      <button class="act" data-del-acc="${a.id}" title="Hapus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`;
+  }
   return `<div class="row"><div class="ic">${esc((a.name[0] || "?").toUpperCase())}</div>
     <div class="grow"><div class="nm">${esc(a.name)}</div><div class="sub">${T[a.type] || a.type}</div></div>
     <span class="amt ${cls}">${rp(a.balance)}</span>
     <button class="act" data-edit-acc="${a.id}" title="Ubah"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
-    <button class="act" data-del-acc="${a.id}" title="Hapus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`;
+    <button class="act" data-del-acc="${a.id}" title="Hapus / arsipkan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`;
 }
 function editAccountSheet(a) {
   const types = [["bank", "Bank"], ["cash", "Tunai"], ["ewallet", "E-wallet"], ["credit_card", "Kartu kredit"]];
@@ -309,10 +323,52 @@ function editAccountSheet(a) {
     } catch (e) { toast(e.message, true); }
   });
 }
-async function deleteAccount(a) {
-  if (!confirm(`Hapus akun "${a.name}"?`)) return;
-  try { await api("DELETE", "/api/accounts/" + encodeURIComponent(a.id)); toast("Akun dihapus"); go("accounts"); }
-  catch (e) { toast(e.message, true); }
+function manageDeleteAccount(a) {
+  const others = ACCOUNTS.filter((x) => x.id !== a.id && !x.archived);
+  const opts = others.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("");
+  $("sheetBody").innerHTML = `<h3>Hapus / Arsipkan Akun</h3>
+    <p class="muted" style="margin:0 0 12px">Akun <b>${esc(a.name)}</b>. Pilih salah satu:</p>
+    ${a.archived ? "" : `<button class="btn ghost" id="md-archive" style="margin-bottom:12px">Arsipkan (sembunyikan tanpa hapus)</button>`}
+    <div class="sec" style="margin:4px 0 8px">Pindahkan transaksi lalu hapus</div>
+    ${others.length ? `
+      <label class="fl">Pindahkan transaksi ke akun</label>
+      <div class="sel-wrap"><select class="field" id="md-target">${opts}</select></div>
+      <button class="btn block" id="md-move" style="margin-top:10px">Pindahkan &amp; Hapus</button>`
+      : `<p class="muted">Tidak ada akun lain untuk menampung transaksinya.</p>`}
+    <button class="btn ghost" id="md-delete" style="margin-top:12px">Hapus permanen</button>
+    <div class="btns"><button class="btn ghost" id="md-cancel">Batal</button></div>`;
+  openSheet();
+  $("md-cancel").addEventListener("click", closeSheet);
+  const arch = $("md-archive");
+  if (arch) arch.addEventListener("click", async () => {
+    try {
+      await api("PATCH", "/api/accounts/" + encodeURIComponent(a.id), { archived: true });
+      closeSheet(); toast("Akun diarsipkan"); go("accounts");
+    } catch (e) { toast(e.message, true); }
+  });
+  const mv = $("md-move");
+  if (mv) mv.addEventListener("click", async () => {
+    const target = $("md-target").value;
+    if (!confirm(`Pindahkan semua transaksi ke akun terpilih lalu hapus "${a.name}"?`)) return;
+    try {
+      await api("DELETE", "/api/accounts/" + encodeURIComponent(a.id) +
+        "?move_to=" + encodeURIComponent(target));
+      closeSheet(); toast("Transaksi dipindahkan, akun dihapus"); go("accounts");
+    } catch (e) { toast(e.message, true); }
+  });
+  $("md-delete").addEventListener("click", async () => {
+    if (!confirm(`Hapus permanen akun "${a.name}"?`)) return;
+    try {
+      await api("DELETE", "/api/accounts/" + encodeURIComponent(a.id));
+      closeSheet(); toast("Akun dihapus"); go("accounts");
+    } catch (e) { toast(e.message, true); }
+  });
+}
+async function unarchiveAccount(a) {
+  try {
+    await api("PATCH", "/api/accounts/" + encodeURIComponent(a.id), { archived: false });
+    toast("Akun diaktifkan kembali"); go("accounts");
+  } catch (e) { toast(e.message, true); }
 }
 function showAddAccount() {
   $("sheetBody").innerHTML = `<h3>Tambah Akun</h3>
@@ -485,7 +541,9 @@ const CATEGORY_LIST = ["Makanan & Minuman", "Transport", "Belanja", "Tagihan",
 const CARD_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>';
 const CHEVRON = '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa1ac" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
 function accountOptions(sel) {
-  return ACCOUNTS.map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
+  // Sembunyikan akun yang diarsipkan (kecuali yang sedang terpilih).
+  return ACCOUNTS.filter((a) => !a.archived || a.id === sel)
+    .map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
 }
 function categoryOptions(sel) {
   const list = CATEGORY_LIST.slice();
