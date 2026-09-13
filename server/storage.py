@@ -140,6 +140,36 @@ class Storage:
             "SELECT * FROM accounts WHERE user_id=? ORDER BY created_at", (user_id,)).fetchall()
         return [dict(r) for r in rows]
 
+    def get_account(self, user_id: str, acc_id: str) -> Optional[Dict[str, Any]]:
+        row = self._db.execute(
+            "SELECT * FROM accounts WHERE id=? AND user_id=?", (acc_id, user_id)).fetchone()
+        return dict(row) if row else None
+
+    def update_account(self, user_id: str, acc_id: str, fields: Dict[str, Any]) -> bool:
+        allowed = ("name", "type", "starting_balance", "currency", "archived")
+        cols = [k for k in fields if k in allowed]
+        if not cols:
+            return False
+        sets = ", ".join(f"{c}=?" for c in cols)
+        params = [fields[c] for c in cols] + [acc_id, user_id]
+        cur = self._db.execute(
+            f"UPDATE accounts SET {sets} WHERE id=? AND user_id=?", params)
+        self._db.commit()
+        return cur.rowcount > 0
+
+    def account_has_transactions(self, user_id: str, acc_id: str) -> bool:
+        row = self._db.execute(
+            "SELECT 1 FROM transactions WHERE user_id=? AND deleted=0 "
+            "AND (from_account_id=? OR to_account_id=?) LIMIT 1",
+            (user_id, acc_id, acc_id)).fetchone()
+        return row is not None
+
+    def delete_account(self, user_id: str, acc_id: str) -> bool:
+        cur = self._db.execute(
+            "DELETE FROM accounts WHERE id=? AND user_id=?", (acc_id, user_id))
+        self._db.commit()
+        return cur.rowcount > 0
+
     # ------------------------------------------------------------------ #
     # Transaksi (per user)
     # ------------------------------------------------------------------ #

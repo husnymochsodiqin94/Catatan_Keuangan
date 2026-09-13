@@ -150,9 +150,10 @@ class Handler(BaseHTTPRequestHandler):
             uid = self._require_user(path)
             if uid is None:
                 return
-            prefix = "/api/transactions/"
-            if path.startswith(prefix):
-                return self._json(service.delete_transaction(_STORAGE, uid, path[len(prefix):]))
+            if path.startswith("/api/transactions/"):
+                return self._json(service.delete_transaction(_STORAGE, uid, path[len("/api/transactions/"):]))
+            if path.startswith("/api/accounts/"):
+                return self._json(service.delete_account(_STORAGE, uid, path[len("/api/accounts/"):]))
             return self._json({"error": "not found"}, 404)
         except (ValidationError, ValueError) as exc:
             return self._json({"error": str(exc)}, 400)
@@ -166,9 +167,10 @@ class Handler(BaseHTTPRequestHandler):
             uid = self._require_user(path)
             if uid is None:
                 return
-            prefix = "/api/transactions/"
-            if path.startswith(prefix):
-                return self._json(service.edit_transaction(_STORAGE, uid, path[len(prefix):], data))
+            if path.startswith("/api/transactions/"):
+                return self._json(service.edit_transaction(_STORAGE, uid, path[len("/api/transactions/"):], data))
+            if path.startswith("/api/accounts/"):
+                return self._json(service.update_account(_STORAGE, uid, path[len("/api/accounts/"):], data))
             return self._json({"error": "not found"}, 404)
         except (ValidationError, ValueError) as exc:
             return self._json({"error": str(exc)}, 400)

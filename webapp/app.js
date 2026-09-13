@@ -272,13 +272,47 @@ async function renderAccounts() {
     try { await api("POST", "/api/auth/logout"); } catch (_) {}
     clearToken(); showAuth("login"); toast("Anda keluar");
   });
+  $("view").querySelectorAll("[data-edit-acc]").forEach((b) => b.addEventListener("click", () => {
+    const a = ACCOUNTS.find((x) => x.id === b.dataset.editAcc); if (a) editAccountSheet(a);
+  }));
+  $("view").querySelectorAll("[data-del-acc]").forEach((b) => b.addEventListener("click", () => {
+    const a = ACCOUNTS.find((x) => x.id === b.dataset.delAcc); if (a) deleteAccount(a);
+  }));
 }
 function acctRow(a) {
   const T = { bank: "Bank", cash: "Tunai", ewallet: "E-wallet", credit_card: "Kartu kredit" };
   const cls = a.type === "credit_card" ? "out" : "";
-  return `<div class="row"><div class="ic">${esc(a.name[0] || "?")}</div>
+  return `<div class="row"><div class="ic">${esc((a.name[0] || "?").toUpperCase())}</div>
     <div class="grow"><div class="nm">${esc(a.name)}</div><div class="sub">${T[a.type] || a.type}</div></div>
-    <span class="amt ${cls}">${rp(a.balance)}</span></div>`;
+    <span class="amt ${cls}">${rp(a.balance)}</span>
+    <button class="act" data-edit-acc="${a.id}" title="Ubah"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
+    <button class="act" data-del-acc="${a.id}" title="Hapus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`;
+}
+function editAccountSheet(a) {
+  const types = [["bank", "Bank"], ["cash", "Tunai"], ["ewallet", "E-wallet"], ["credit_card", "Kartu kredit"]];
+  $("sheetBody").innerHTML = `<h3>Ubah Akun</h3>
+    <label class="fl">Nama akun</label><input class="field" id="ea-name" value="${esc(a.name)}" />
+    <label class="fl">Tipe</label>
+    <select class="field" id="ea-type">${types.map(([v, l]) => `<option value="${v}" ${a.type === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <label class="fl">Saldo awal (Rp)</label><input class="field" id="ea-bal" inputmode="numeric" value="${a.starting_balance != null ? a.starting_balance : a.balance}" />
+    <div class="btns"><button class="btn ghost" id="ea-cancel">Batal</button><button class="btn primary" id="ea-save">Simpan</button></div>`;
+  openSheet();
+  $("ea-cancel").addEventListener("click", closeSheet);
+  $("ea-save").addEventListener("click", async () => {
+    const name = $("ea-name").value.trim();
+    if (!name) return toast("Nama akun wajib diisi", true);
+    const bal = parseInt(($("ea-bal").value || "0").replace(/\D/g, ""), 10) || 0;
+    try {
+      await api("PATCH", "/api/accounts/" + encodeURIComponent(a.id),
+        { name, type: $("ea-type").value, starting_balance: bal });
+      closeSheet(); toast("Akun diperbarui"); go("accounts");
+    } catch (e) { toast(e.message, true); }
+  });
+}
+async function deleteAccount(a) {
+  if (!confirm(`Hapus akun "${a.name}"?`)) return;
+  try { await api("DELETE", "/api/accounts/" + encodeURIComponent(a.id)); toast("Akun dihapus"); go("accounts"); }
+  catch (e) { toast(e.message, true); }
 }
 function showAddAccount() {
   $("sheetBody").innerHTML = `<h3>Tambah Akun</h3>

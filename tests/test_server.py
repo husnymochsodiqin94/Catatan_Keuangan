@@ -80,6 +80,31 @@ class TestAccounts(BaseCase):
             service.create_account(self.s, self.uid, "X", "kripto", 0)
 
 
+class TestAccountEditDelete(BaseCase):
+    def test_update_account(self):
+        service.update_account(self.s, self.uid, self.mandiri["id"],
+                               {"name": "Mandiri Utama", "starting_balance": 2_000_000})
+        accs = {a["name"]: a for a in service.list_accounts(self.s, self.uid)}
+        self.assertIn("Mandiri Utama", accs)
+        self.assertEqual(accs["Mandiri Utama"]["balance"], 2_000_000)
+
+    def test_delete_akun_kosong(self):
+        service.delete_account(self.s, self.uid, self.mandiri["id"])
+        names = [a["name"] for a in service.list_accounts(self.s, self.uid)]
+        self.assertNotIn("Mandiri", names)
+
+    def test_delete_akun_bertransaksi_ditolak(self):
+        service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 10_000, "account_id": self.bca["id"]})
+        with self.assertRaises(ValidationError):
+            service.delete_account(self.s, self.uid, self.bca["id"])
+
+    def test_update_akun_milik_orang_lain_ditolak(self):
+        reg2 = service.register(self.s, "b@b.com", "rahasia2")
+        with self.assertRaises(ValidationError):
+            service.update_account(self.s, reg2["user"]["id"], self.bca["id"], {"name": "X"})
+
+
 class TestParse(BaseCase):
     def test_parse_resolve_akun(self):
         d = service.parse_text(self.s, self.uid, "beli kopi 35 ribu pakai BCA")["drafts"][0]

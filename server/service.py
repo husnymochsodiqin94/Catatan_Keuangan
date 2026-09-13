@@ -108,7 +108,8 @@ def build_engine(storage: Storage, user_id: str) -> FinancialEngine:
 def list_accounts(storage: Storage, user_id: str) -> List[Dict[str, Any]]:
     e = build_engine(storage, user_id)
     return [
-        {"id": a.id, "name": a.name, "type": a.type.value, "balance": e.balance(a.id)}
+        {"id": a.id, "name": a.name, "type": a.type.value,
+         "balance": e.balance(a.id), "starting_balance": a.starting_balance}
         for a in e.accounts()
     ]
 
@@ -121,6 +122,39 @@ def create_account(storage: Storage, user_id: str, name: str, type: str,
     if not isinstance(starting_balance, int) or isinstance(starting_balance, bool):
         raise ValidationError("saldo awal harus integer")
     return storage.add_account(user_id, name.strip(), type, starting_balance)
+
+
+def update_account(storage: Storage, user_id: str, acc_id: str,
+                   fields: Dict[str, Any]) -> Dict[str, Any]:
+    if not storage.get_account(user_id, acc_id):
+        raise ValidationError("akun tidak ditemukan")
+    patch: Dict[str, Any] = {}
+    if "name" in fields:
+        name = (fields["name"] or "").strip()
+        if not name:
+            raise ValidationError("nama akun wajib diisi")
+        patch["name"] = name
+    if "type" in fields:
+        AccountType(fields["type"])  # validasi
+        patch["type"] = fields["type"]
+    if "starting_balance" in fields:
+        sb = fields["starting_balance"]
+        if not isinstance(sb, int) or isinstance(sb, bool):
+            raise ValidationError("saldo awal harus integer")
+        patch["starting_balance"] = sb
+    storage.update_account(user_id, acc_id, patch)
+    e = build_engine(storage, user_id)
+    a = storage.get_account(user_id, acc_id)
+    return {"id": a["id"], "name": a["name"], "type": a["type"], "balance": e.balance(acc_id)}
+
+
+def delete_account(storage: Storage, user_id: str, acc_id: str) -> Dict[str, Any]:
+    if not storage.get_account(user_id, acc_id):
+        raise ValidationError("akun tidak ditemukan")
+    if storage.account_has_transactions(user_id, acc_id):
+        raise ValidationError("Akun masih punya transaksi — hapus/pindahkan transaksinya dulu.")
+    storage.delete_account(user_id, acc_id)
+    return {"ok": True}
 
 
 # --------------------------------------------------------------------- #
