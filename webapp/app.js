@@ -8,13 +8,28 @@ const esc = (s) => (s == null ? "" : String(s).replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])));
 const TYPE_LABEL = { income: "Pemasukan", expense: "Pengeluaran", transfer: "Transfer", refund: "Refund" };
 
+function getToken() { try { return localStorage.getItem("ck_token") || ""; } catch (_) { return ""; } }
 async function api(method, path, body) {
   const opt = { method, headers: {} };
+  const tok = getToken(); if (tok) opt.headers["X-Token"] = tok;
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   const res = await fetch(path, opt);
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { showUnlock(); throw new Error("Perlu token akses"); }
   if (!res.ok) throw new Error(data.error || "Terjadi kesalahan");
   return data;
+}
+function showUnlock() {
+  VIEW = "__lock";
+  $("topbar").innerHTML = ""; $("nav").innerHTML = ""; $("fab").hidden = true;
+  $("view").innerHTML = `<div class="lock">
+    <div class="logo"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2a3 3 0 013 3v6a3 3 0 01-6 0V5a3 3 0 013-3z"/><path d="M19 10a7 7 0 01-14 0"/><path d="M12 19v3"/></svg></div>
+    <h1>Masuk</h1><p class="muted">Masukkan token akses untuk membuka aplikasi.</p>
+    <input class="field" id="lk-token" type="password" placeholder="Token akses" />
+    <button class="btn primary" id="lk-go" style="margin-top:14px">Masuk</button></div>`;
+  const go2 = () => { const t = $("lk-token").value.trim(); if (!t) return; try { localStorage.setItem("ck_token", t); } catch (_) {} $("fab").hidden = false; go("home"); };
+  $("lk-go").addEventListener("click", go2);
+  $("lk-token").addEventListener("keydown", (e) => { if (e.key === "Enter") go2(); });
 }
 
 let ACCOUNTS = [];
@@ -55,6 +70,7 @@ async function render() {
     else if (VIEW === "anggaran") await renderAnggaran();
     else if (VIEW === "accounts") await renderAccounts();
   } catch (e) {
+    if (VIEW === "__lock") return; // layar kunci sedang tampil
     v.innerHTML = `<div class="empty"><div class="big">⚠️</div><p>${esc(e.message)}</p></div>`;
   }
 }
@@ -76,12 +92,19 @@ async function renderHome() {
   const banner = alert ? `<div class="alert-banner ${alert.level === "over" ? "over" : ""}">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
     <div><b>${esc(alert.title)}</b><div>${esc(alert.message)}</div></div></div>` : "";
+  const topCat = cats[0] ? cats[0].category : null;
+  const chips = accts.filter((a) => a.type !== "credit_card").slice(0, 3)
+    .map((a) => `<div class="bchip"><div class="n">${esc(a.name)}</div><div class="v">${rp(a.balance)}</div></div>`).join("");
   $("view").innerHTML = banner + `
+    <div class="card hero balance">
+      <div class="label">Total Saldo</div><div class="value">${rp(sum.total_balance)}</div>
+      ${chips ? `<div class="bchips">${chips}</div>` : ""}
+    </div>
     <div class="cards">
-      <div class="card hero wide"><div class="label">Total Saldo</div><div class="value">${rp(sum.total_balance)}</div></div>
       <div class="card"><div class="label">Masuk (bln ini)</div><div class="value in">+${rp(sum.income)}</div></div>
-      <div class="card"><div class="label">Keluar (bln ini)</div><div class="value out">−${rp(sum.expense)}</div></div>
-      <div class="card wide"><div class="label">Arus Kas Bersih</div><div class="value ${ncf < 0 ? "out" : "in"}">${ncf < 0 ? "−" : "+"}${rp(ncf)}</div></div>
+      <div class="card"><div class="label">Keluar (bln ini)</div><div class="value out">−${rp(sum.expense)}</div>
+        ${topCat ? `<div class="muted" style="font-size:11px;margin-top:3px">Terbesar: ${esc(topCat)}</div>` : ""}</div>
+      <div class="card wide"><div class="label">Arus Kas Bersih (bln ini)</div><div class="value ${ncf < 0 ? "out" : "in"}">${ncf < 0 ? "−" : "+"}${rp(ncf)}</div></div>
     </div>
     ${cats.length ? `<div class="sec">Pengeluaran per kategori</div>${cats.map((c) => `
       <div class="bar-row"><div class="bar-top"><span>${esc(c.category)}</span><span>${rp(c.amount)}</span></div>
@@ -307,6 +330,7 @@ function openCapture() {
   $("sheetBody").innerHTML = `
     <h3>Catat transaksi</h3>
     <div class="cap-mic">
+      <div class="waveform" id="wave">${Array.from({length:19}).map(()=>"<i></i>").join("")}</div>
       <div class="transcript" id="cap-transcript"></div>
       <button class="mic-btn" id="mic"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2a3 3 0 013 3v6a3 3 0 01-6 0V5a3 3 0 013-3z"/><path d="M19 10a7 7 0 01-14 0"/><path d="M12 19v3"/></svg></button>
       <div class="cap-hint" id="cap-hint">Tekan mic lalu ucapkan, atau ketik di bawah</div>
@@ -325,6 +349,7 @@ function toggleVoice() {
   if (recognition) return stopVoice();
   recognition = new SR(); recognition.lang = "id-ID"; recognition.interimResults = true; recognition.maxAlternatives = 1;
   $("mic").classList.add("rec"); $("cap-hint").textContent = "Mendengarkan…";
+  const w = $("wave"); if (w) w.classList.add("on");
   recognition.onresult = (e) => {
     const t = Array.from(e.results).map((r) => r[0].transcript).join("");
     $("cap-transcript").textContent = t; $("cap-text").value = t;
@@ -337,6 +362,7 @@ function toggleVoice() {
 function stopVoice() {
   if (recognition) { try { recognition.stop(); } catch (_) {} recognition = null; }
   const m = $("mic"); if (m) m.classList.remove("rec");
+  const w = $("wave"); if (w) w.classList.remove("on");
   const h = $("cap-hint"); if (h) h.textContent = "Tekan mic lalu ucapkan, atau ketik di bawah";
 }
 async function submitCapture(text) {
