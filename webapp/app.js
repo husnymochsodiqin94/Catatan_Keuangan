@@ -62,6 +62,12 @@ function showAuth(mode) {
 let ACCOUNTS = [];
 let VIEW = "home";
 let draft = null;
+let CATS = null; // {income:[{category,subcategories}], expense:[...]} — dari /api/categories
+async function loadCats() {
+  if (CATS) return CATS;
+  try { CATS = await api("GET", "/api/categories"); } catch (_) { CATS = { income: [], expense: [] }; }
+  return CATS;
+}
 
 // ---- toast + sheet ------------------------------------------------- //
 function toast(msg, err) {
@@ -542,7 +548,7 @@ async function submitCapture(text) {
   stopVoice();
   $("sheetBody").innerHTML = '<div class="loading"><div class="spin"></div>Memahami…</div>';
   try {
-    const out = await api("POST", "/api/parse", { text });
+    const [out] = await Promise.all([api("POST", "/api/parse", { text }), loadCats()]);
     const drafts = out.drafts || [];
     if (!drafts.length || drafts[0].status === "not_transaction")
       return showMessage("Sepertinya ini bukan transaksi. Coba sebutkan nominalnya.");
@@ -556,8 +562,6 @@ function showMessage(msg) {
 }
 
 // ---- CONFIRM (draft editable, gaya mockup) ------------------------- //
-const CATEGORY_LIST = ["Makanan & Minuman", "Transport", "Belanja", "Tagihan",
-  "Hiburan", "Kesehatan", "Pendidikan", "Gaji", "Bonus", "Lainnya"];
 const CARD_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>';
 const CHEVRON = '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa1ac" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
 function accountOptions(sel) {
@@ -565,10 +569,20 @@ function accountOptions(sel) {
   return ACCOUNTS.filter((a) => !a.archived || a.id === sel)
     .map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
 }
-function categoryOptions(sel) {
-  const list = CATEGORY_LIST.slice();
-  if (sel && !list.includes(sel)) list.unshift(sel);
-  return list.map((c) => `<option value="${esc(c)}" ${c === sel ? "selected" : ""}>${esc(c)}</option>`).join("");
+function categoryOptions(sel, type) {
+  const groups = (CATS && (type === "income" ? CATS.income : CATS.expense)) || [];
+  const opt = (v, label) => `<option value="${esc(v)}" ${v === sel ? "selected" : ""}>${esc(label || v)}</option>`;
+  const seen = new Set();
+  let html = "";
+  groups.forEach((g) => {
+    seen.add(g.category);
+    let inner = opt(g.category, g.category + " — umum");
+    (g.subcategories || []).forEach((s) => { seen.add(s); inner += opt(s); });
+    html += `<optgroup label="${esc(g.category)}">${inner}</optgroup>`;
+  });
+  // Nilai terpilih yang tak ada di listing (mis. transaksi lama) tetap ditampilkan.
+  if (sel && !seen.has(sel)) html = `<optgroup label="Lainnya">${opt(sel)}</optgroup>` + html;
+  return html || opt(sel || "");
 }
 function showConfirm(d) {
   draft = d;
@@ -593,7 +607,7 @@ function showConfirm(d) {
           <div class="draft-row"><span class="k">Dari akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-from">${accountOptions(draft.from_account_id)}</select>${CHEVRON}</div></div></div>
           <div class="draft-row"><span class="k">Ke akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-to">${accountOptions(draft.to_account_id)}</select>${CHEVRON}</div></div></div>
         ` : `
-          <div class="draft-row"><span class="k">Kategori</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${catIcon}</span><select id="d-cat">${categoryOptions(draft.category)}</select>${CHEVRON}</div></div></div>
+          <div class="draft-row"><span class="k">Kategori</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${catIcon}</span><select id="d-cat">${categoryOptions(draft.category, draft.type)}</select>${CHEVRON}</div></div></div>
           <div class="draft-row"><span class="k">Akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-acc">${accountOptions(draft.account_id)}</select>${CHEVRON}</div></div></div>
         `}
         <div class="draft-row"><span class="k">Tanggal</span><div class="ctrl"><div class="num-wrap"><input type="date" id="d-date" value="${dateStr}" /><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></span></div></div></div>

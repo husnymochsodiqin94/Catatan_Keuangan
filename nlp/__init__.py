@@ -11,6 +11,7 @@ Financial Engine -> (persistensi, di luar modul ini). Output AI TIDAK boleh
 langsung masuk database.
 """
 
+from . import taxonomy
 from .schema import ParsedTransaction, ParseResult, validate_schema
 from .parser import RuleBasedParser, TransactionParser
 from .pipeline import Draft, ParsePipeline, PipelineError
@@ -24,4 +25,5 @@ __all__ = [
     "ParsePipeline",
     "Draft",
     "PipelineError",
+    "taxonomy",
 ]

@@ -11,6 +11,7 @@ import re
 from datetime import date, time, timedelta
 from typing import List, Optional, Protocol, Tuple
 
+from . import taxonomy
 from .schema import ParsedTransaction, ParseResult
 
 
@@ -28,21 +29,8 @@ ACCOUNTS = {
     "cash": "Cash", "tunai": "Cash",
 }
 
-# keyword -> (kategori, subkategori)
-CATEGORIES = {
-    "kopi": ("Makanan & Minuman", "Kopi"),
-    "makan": ("Makanan & Minuman", None),
-    "makanan": ("Makanan & Minuman", None),
-    "jajan": ("Makanan & Minuman", None),
-    "bensin": ("Transport", "Bensin"),
-    "parkir": ("Transport", "Parkir"),
-    "grab": ("Transport", None),
-    "gojek": ("Transport", None),
-    "ojek": ("Transport", None),
-    "pulsa": ("Tagihan", "Pulsa"),
-    "listrik": ("Tagihan", "Listrik"),
-    "belanja": ("Belanja", None),
-}
+# Pemetaan kategori/subkategori berbasis keyword: lihat ``nlp/taxonomy.py``
+# (sumber kebenaran tunggal untuk listing & deteksi).
 
 INCOME_KEYWORDS = ("gaji", "gajian", "terima", "diterima", "bonus", "pemasukan", "thr")
 EXPENSE_VERBS = ("beli", "bayar", "belanja", "jajan", "keluar")
@@ -98,25 +86,26 @@ class RuleBasedParser:
             pt.category, pt.subcategory = cat
 
         # tipe transaksi + akun
+        cat_type = taxonomy.type_of(pt.category)  # 'income'/'expense'/None dari listing
         type_signal = "none"
-        if any(k in low for k in TRANSFER_KEYWORDS) or self._has_dari_ke(low):
+        if self._has_kw(low, TRANSFER_KEYWORDS) or self._has_dari_ke(low):
             pt.type = "transfer"
             pt.from_account, pt.to_account = self._parse_transfer_accounts(low)
             type_signal = "verb"
-        elif any(k in low for k in REFUND_KEYWORDS):
+        elif self._has_kw(low, REFUND_KEYWORDS):
             pt.type = "refund"
             pt.account = self._first_account(low)
             type_signal = "verb"
-        elif any(k in low for k in INCOME_KEYWORDS):
+        elif self._has_kw(low, INCOME_KEYWORDS) or cat_type == "income":
             pt.type = "income"
             pt.account = self._first_account(low)
-            type_signal = "verb"
-        elif any(k in low for k in EXPENSE_VERBS):
+            type_signal = "verb" if self._has_kw(low, INCOME_KEYWORDS) else "category"
+        elif self._has_kw(low, EXPENSE_VERBS):
             pt.type = "expense"
             pt.account = self._first_account(low)
             type_signal = "verb"
         elif pt.category is not None:
-            # ada kategori pengeluaran tanpa kata kerja -> tebak expense (conf lebih rendah)
+            # ada kategori (pengeluaran) tanpa kata kerja -> tebak expense (conf lebih rendah)
             pt.type = "expense"
             pt.account = self._first_account(low)
             type_signal = "category"
@@ -192,16 +181,18 @@ class RuleBasedParser:
     # Kategori, akun, merchant
     # ------------------------------------------------------------------ #
     def _match_category(self, low: str) -> Optional[Tuple[str, Optional[str]]]:
-        for kw, val in CATEGORIES.items():
-            if re.search(rf"\b{re.escape(kw)}\b", low):
-                return val
-        return None
+        return taxonomy.match(low)
 
     def _first_account(self, low: str) -> Optional[str]:
         for kw, label in ACCOUNTS.items():
             if re.search(rf"\b{re.escape(kw)}\b", low):
                 return label
         return None
+
+    @staticmethod
+    def _has_kw(low: str, keywords) -> bool:
+        # Cocokkan per-kata (bukan substring) agar mis. "tf" tak cocok dgn "neTFlix".
+        return any(re.search(rf"\b{re.escape(k)}\b", low) for k in keywords)
 
     def _has_dari_ke(self, low: str) -> bool:
         return bool(re.search(r"\bdari\b.*\bke\b", low))

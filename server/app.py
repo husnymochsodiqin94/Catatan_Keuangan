@@ -26,7 +26,7 @@ _CONTENT_TYPES = {
     ".webmanifest": "application/manifest+json", ".json": "application/json",
     ".png": "image/png", ".ico": "image/x-icon",
 }
-_PUBLIC = {"/api/health", "/api/auth/register", "/api/auth/login"}
+_PUBLIC = {"/api/health", "/api/categories", "/api/auth/register", "/api/auth/login"}
 
 
 def _int(qs: dict, key: str):
@@ -83,6 +83,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/health":
                 return self._json({"ok": True})
+            if path == "/api/categories":
+                return self._json(service.list_categories())
             if path.startswith("/api/"):
                 uid = self._require_user(path)
                 if uid is None:

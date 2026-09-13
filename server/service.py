@@ -20,7 +20,7 @@ from financial_engine import (
     ValidationError,
 )
 from financial_engine.budgeting import evaluate as evaluate_budgets
-from nlp import ParsePipeline
+from nlp import ParsePipeline, taxonomy
 from reporting.dashboard import _tx_view, build_dashboard, transaction_views
 
 from . import auth, email_alert
@@ -167,6 +167,13 @@ def delete_account(storage: Storage, user_id: str, acc_id: str,
             "Akun masih punya transaksi — pindahkan transaksinya dulu atau arsipkan.")
     storage.delete_account(user_id, acc_id)
     return {"ok": True}
+
+
+# --------------------------------------------------------------------- #
+# Kategori (listing taksonomi — sumber kebenaran di nlp/taxonomy.py)
+# --------------------------------------------------------------------- #
+def list_categories() -> Dict[str, Any]:
+    return taxonomy.grouped()
 
 
 # --------------------------------------------------------------------- #

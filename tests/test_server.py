@@ -137,6 +137,18 @@ class TestAccountEditDelete(BaseCase):
             service.delete_account(self.s, self.uid, self.bca["id"], move_to="acc_tidak_ada")
 
 
+class TestCategories(BaseCase):
+    def test_listing_kategori(self):
+        cats = service.list_categories()
+        self.assertIn("income", cats)
+        self.assertIn("expense", cats)
+        names = [g["category"] for g in cats["expense"]]
+        self.assertIn("Makanan & Minuman", names)
+        self.assertIn("Transportasi & Mobilitas", names)
+        # tiap kategori punya subkategori
+        self.assertTrue(all(g["subcategories"] for g in cats["expense"]))
+
+
 class TestParse(BaseCase):
     def test_parse_resolve_akun(self):
         d = service.parse_text(self.s, self.uid, "beli kopi 35 ribu pakai BCA")["drafts"][0]

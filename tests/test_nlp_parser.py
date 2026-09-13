@@ -32,7 +32,7 @@ class TestExpense(BaseCase):
         self.assertEqual(d.parsed.amount, 35_000)
         self.assertEqual(d.parsed.currency, "IDR")
         self.assertEqual(d.parsed.category, "Makanan & Minuman")
-        self.assertEqual(d.parsed.subcategory, "Kopi")
+        self.assertEqual(d.parsed.subcategory, "Restoran & Cafe")
         self.assertEqual(d.account_id, self.bca.id)
         self.assertEqual(d.status, READY)
         self.assertGreaterEqual(d.parsed.confidence, 0.8)
@@ -74,7 +74,7 @@ class TestMultipleTransaction(BaseCase):
         self.assertEqual(drafts[0].parsed.type, "expense")
         self.assertEqual(drafts[1].parsed.amount, 5_000)
         self.assertEqual(drafts[1].parsed.type, "expense")
-        self.assertEqual(drafts[1].parsed.category, "Transport")
+        self.assertEqual(drafts[1].parsed.category, "Transportasi & Mobilitas")
 
 
 class TestNaturalDate(BaseCase):
@@ -208,6 +208,31 @@ class TestSchemaValidation(BaseCase):
     def test_output_lolos_schema(self):
         for d in self.pipe.process("beli kopi 35 ribu pakai BCA"):
             self.assertEqual(validate_schema(d.parsed), [])
+
+
+class TestTaksonomi(BaseCase):
+    def test_kategori_dari_taksonomi(self):
+        cases = {
+            "beli sepatu lari 500rb pakai BCA":
+                ("expense", "Kesehatan & Olahraga", "Peralatan Olahraga & Apparel"),
+            "isi pertamax 100rb pakai BCA":
+                ("expense", "Transportasi & Mobilitas", "BBM & Bahan Bakar"),
+            "bayar parkir 5rb pakai BCA":
+                ("expense", "Transportasi & Mobilitas", "Parkir & Tol"),
+        }
+        for text, (typ, cat, sub) in cases.items():
+            r = self.parser.parse(text).transactions[0]
+            self.assertEqual((r.type, r.category, r.subcategory), (typ, cat, sub), text)
+
+    def test_langganan_bukan_transfer(self):  # regresi: "tf" di "neTFlix"
+        r = self.parser.parse("langganan netflix 186rb pakai BCA").transactions[0]
+        self.assertEqual(r.type, "expense")
+        self.assertEqual(r.category, "Tagihan & Utilitas")
+
+    def test_kategori_pemasukan_menentukan_tipe_income(self):
+        r = self.parser.parse("dividen saham 1 juta masuk BCA").transactions[0]
+        self.assertEqual(r.type, "income")
+        self.assertEqual(r.category, "Pemasukan Pasif & Investasi")
 
 
 if __name__ == "__main__":

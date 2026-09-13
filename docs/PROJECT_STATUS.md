@@ -8,7 +8,7 @@ _Terakhir diperbarui: 2026-09-12_
 Berfungsi: capture (suara/teks) → parse → konfirmasi → simpan; dashboard; riwayat (search/filter/**edit**/hapus); **Anggaran** (batas pengeluaran & target pemasukan per hari/minggu/bulan, anggaran per kategori, status & alert); **banner alert** di Beranda; **auth token opsional** (`CATATAN_TOKEN`) & **alert email** (`SMTP_*`) untuk deploy; **layout desktop** (sidebar) responsif. Semua angka dari engine.
 
 **Cara jalankan:** `python3 -m server.app` → http://127.0.0.1:8000. Deploy & env: `docs/DEPLOY.md`.
-**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **87 test OK**.
+**Cara jalankan test:** `python3 -m unittest discover -s tests -t .` (stdlib, tanpa dependency). Status terakhir: **91 test OK**.
 
 ## Roadmap Fitur (dari masukan user, 2026-09-12)
 - **Sudah ada di engine (tinggal disambungkan ke UI):** transfer antar akun, e-wallet, kartu kredit/liabilitas (utang dasar).
@@ -51,7 +51,8 @@ Berfungsi: capture (suara/teks) → parse → konfirmasi → simpan; dashboard; 
 - [x] **Edit & Hapus Akun**: `PATCH/DELETE /api/accounts/{id}` (nama/tipe/saldo awal), guard menolak hapus akun yang masih punya transaksi & akun milik user lain. UI: tombol ubah/hapus di daftar Akun.
 - [x] **Arsip & Pindah-lalu-hapus Akun**: (a) **Arsipkan** akun (`PATCH archived:true`) — disembunyikan dari dropdown transaksi & chip Beranda, tidak bisa dipakai transaksi baru (guard engine), tampil di bagian "Diarsipkan" dengan tombol Aktifkan kembali. (b) **Pindahkan transaksi lalu hapus** (`DELETE /api/accounts/{id}?move_to={targetId}`) — semua transaksi di-reassign ke akun tujuan (transfer yang jadi ke-diri-sendiri di-soft-delete) lalu akun dihapus. UI: sheet "Hapus / Arsipkan Akun" dengan pilihan Arsipkan, Pindahkan & Hapus (dropdown akun tujuan), atau Hapus permanen. **87 test OK**.
 - [x] **Perbaikan migrasi DB lama**: index `user_id` dibuat setelah `_migrate()`, dan `_migrate()` menambal kolom `user_id`+`archived` yang belum ada — mengatasi `no such column: user_id` pada DB single-user lama.
-- [x] **Pemisah ribuan pada input angka** (id-ID, mis. `10.000.000`): semua field nominal/saldo/batas (bukan persen) memformat otomatis saat diketik via kelas `.money`; nilai tetap dibaca sebagai integer di backend. Service worker `ck-shell-v4`.
+- [x] **Pemisah ribuan pada input angka** (id-ID, mis. `10.000.000`): semua field nominal/saldo/batas (bukan persen) memformat otomatis saat diketik via kelas `.money`; nilai tetap dibaca sebagai integer di backend.
+- [x] **Taksonomi kategori (listing)** `nlp/taxonomy.py` — sumber kebenaran tunggal: 3 kategori Pemasukan + 8 kategori Pengeluaran, masing-masing dengan subkategori & keyword (dari dokumen taksonomi user). Parser rule-based memakai keyword untuk mengisi kategori/subkategori dan **menentukan tipe dari grup kategori** (mis. "dividen" → income). Endpoint publik `GET /api/categories` menyajikan listing terkelompok. Dropdown Kategori di draft kini **berkelompok (`optgroup`) per kategori utama + subkategori**, tersaring sesuai jenis (pemasukan/pengeluaran). Perbaikan regresi: kata kunci tipe (transfer/refund/income/expense) dicocokkan **per-kata** agar "tf" tak salah cocok di "ne**tf**lix". Service worker `ck-shell-v5`. **91 test OK**.
 - [x] **Audit MVP** (`docs/AUDIT_REPORT.md`): financial accuracy, AI, security, performance, token/AI-cost. Defect diperbaiki: A1 splitter "hari lalu", A2 angka frasa waktu jadi nominal, P1 repeated processing di `net_worth`. Regresi `TestTemporalNotAmount` ditambahkan.
 
 ## Temuan Audit Terbuka (belum dikerjakan — bukan defect diam-diam)
