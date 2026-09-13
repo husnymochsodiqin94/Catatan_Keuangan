@@ -93,10 +93,14 @@ let ACCOUNTS = [];
 let VIEW = "home";
 let draft = null;
 let CATS = null; // {income:[{category,subcategories}], expense:[...]} — dari /api/categories
+const catsLoaded = (c) => c && ((c.income && c.income.length) || (c.expense && c.expense.length));
 async function loadCats() {
-  if (CATS) return CATS;
-  try { CATS = await api("GET", "/api/categories"); } catch (_) { CATS = { income: [], expense: [] }; }
-  return CATS;
+  if (catsLoaded(CATS)) return CATS;              // hanya cache hasil yang valid
+  try {
+    const c = await api("GET", "/api/categories");
+    if (catsLoaded(c)) CATS = c;
+  } catch (_) { /* biarkan null agar dicoba lagi nanti */ }
+  return CATS || { income: [], expense: [] };
 }
 
 // ---- toast + sheet ------------------------------------------------- //
