@@ -288,10 +288,23 @@ function histRow(t) {
     <button class="act" data-edit="${t.id}" title="Ubah"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
     <button class="act" data-del="${t.id}" title="Hapus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`;
 }
-function editSheet(t) {
+async function editSheet(t) {
+  await loadCats();
+  if (!ACCOUNTS.length) { try { ACCOUNTS = await api("GET", "/api/accounts"); } catch (_) {} }
+  const isTf = t.type === "transfer";
+  const curAcc = t.from_account_id || t.to_account_id;
+  const dateStr = (t.date || "").slice(0, 10);
+  const catRow = isTf ? "" : `<label class="fl">Kategori</label>
+    <select class="field" id="e-cat">${categoryOptions(t.category, t.type)}</select>`;
+  const accRow = isTf
+    ? `<label class="fl">Dari akun</label><select class="field" id="e-from">${accountOptions(t.from_account_id)}</select>
+       <label class="fl">Ke akun</label><select class="field" id="e-to">${accountOptions(t.to_account_id)}</select>`
+    : `<label class="fl">Akun</label><select class="field" id="e-acc">${accountOptions(curAcc)}</select>`;
   $("sheetBody").innerHTML = `<h3>Ubah transaksi</h3>
     <label class="fl">Nominal (Rp)</label><input class="field money" id="e-amt" inputmode="numeric" value="${groupDigits(t.amount)}" />
-    <label class="fl">Kategori</label><input class="field" id="e-cat" value="${esc(t.category || "")}" />
+    ${catRow}
+    ${accRow}
+    <label class="fl">Tanggal</label><input class="field" type="date" id="e-date" value="${dateStr}" />
     <label class="fl">Catatan</label><input class="field" id="e-note" value="${esc(t.note || "")}" />
     <div class="btns"><button class="btn ghost" id="e-cancel">Batal</button><button class="btn primary" id="e-save">Simpan</button></div>`;
   openSheet();
@@ -299,9 +312,21 @@ function editSheet(t) {
   $("e-save").addEventListener("click", async () => {
     const amt = parseInt(($("e-amt").value || "").replace(/\D/g, ""), 10) || 0;
     if (amt <= 0) return toast("Nominal harus > 0", true);
+    const patch = { amount: amt, note: $("e-note").value || null };
+    const dv = $("e-date"); if (dv && dv.value) patch.occurred_at = dv.value + "T12:00:00";
+    if (isTf) {
+      patch.from_account_id = $("e-from").value;
+      patch.to_account_id = $("e-to").value;
+      if (patch.from_account_id === patch.to_account_id)
+        return toast("Akun asal & tujuan harus berbeda", true);
+    } else {
+      const c = $("e-cat"); if (c) patch.category = c.value || null;
+      const accId = $("e-acc").value;
+      if (t.type === "expense") patch.from_account_id = accId;
+      else patch.to_account_id = accId;   // income / refund
+    }
     try {
-      await api("PATCH", "/api/transactions/" + encodeURIComponent(t.id),
-        { amount: amt, category: $("e-cat").value || null, note: $("e-note").value || null });
+      await api("PATCH", "/api/transactions/" + encodeURIComponent(t.id), patch);
       closeSheet(); toast("Diperbarui"); renderHistory();
     } catch (e) { toast(e.message, true); }
   });
@@ -629,6 +654,8 @@ function categoryOptions(sel, type) {
 }
 function showConfirm(d) {
   draft = d;
+  // Utamakan subkategori spesifik (mis. "BBM & Bahan Bakar") daripada kategori umum.
+  if (draft.subcategory) draft.category = draft.subcategory;
   const types = ["expense", "income", "transfer", "refund"];
   const isTransfer = () => draft.type === "transfer";
   const dupBanner = (d.duplicates && d.duplicates.length) ? `<div class="banner">Mirip transaksi sebelumnya — tetap simpan?</div>` : "";

@@ -44,6 +44,8 @@ def _tx_view(engine: FinancialEngine, tx: Transaction) -> Dict[str, object]:
         "amount": tx.amount,
         "category": tx.category,
         "account": _account_label(engine, tx),
+        "from_account_id": tx.from_account_id,
+        "to_account_id": tx.to_account_id,
         "date": tx.occurred_at.date().isoformat(),
         "note": tx.note,
     }
