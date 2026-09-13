@@ -445,40 +445,58 @@ function showMessage(msg) {
   $("m-close").addEventListener("click", closeSheet);
 }
 
-// ---- CONFIRM (draft editable) -------------------------------------- //
+// ---- CONFIRM (draft editable, gaya mockup) ------------------------- //
+const CATEGORY_LIST = ["Makanan & Minuman", "Transport", "Belanja", "Tagihan",
+  "Hiburan", "Kesehatan", "Pendidikan", "Gaji", "Bonus", "Lainnya"];
+const CARD_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>';
+const CHEVRON = '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa1ac" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
 function accountOptions(sel) {
   return ACCOUNTS.map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
+}
+function categoryOptions(sel) {
+  const list = CATEGORY_LIST.slice();
+  if (sel && !list.includes(sel)) list.unshift(sel);
+  return list.map((c) => `<option value="${esc(c)}" ${c === sel ? "selected" : ""}>${esc(c)}</option>`).join("");
 }
 function showConfirm(d) {
   draft = d;
   const types = ["expense", "income", "transfer", "refund"];
   const isTransfer = () => draft.type === "transfer";
   const dupBanner = (d.duplicates && d.duplicates.length) ? `<div class="banner">Mirip transaksi sebelumnya — tetap simpan?</div>` : "";
+  const dateStr = (draft.occurred_at || "").slice(0, 10);
+  const timeStr = (draft.occurred_at || "").slice(11) || "12:00:00";
+  const waveBars = [22,48,70,95,60,85,40,66,92,52,76,34,58,88,44,68,28].map((h) => `<i style="height:${h}%"></i>`).join("");
+
   const render = () => {
+    const catIcon = categoryIcon(draft.category, draft.type);
     $("sheetBody").innerHTML = `
-      <h3>Konfirmasi transaksi</h3>
-      ${dupBanner}
-      <div class="seg" id="seg">${types.map((t) => `<span data-t="${t}" class="${draft.type === t ? "on" : ""}">${TYPE_LABEL[t]}</span>`).join("")}</div>
-      <div class="amount-big">${rp(draft.amount || 0)}</div>
-      <label class="fl">Nominal (Rp)</label>
-      <input class="field" id="d-amt" inputmode="numeric" value="${draft.amount || ""}" />
-      ${isTransfer() ? `
-        <label class="fl">Dari akun</label><select class="field" id="d-from">${accountOptions(draft.from_account_id)}</select>
-        <label class="fl">Ke akun</label><select class="field" id="d-to">${accountOptions(draft.to_account_id)}</select>
-      ` : `
-        <label class="fl">Akun</label><select class="field" id="d-acc">${accountOptions(draft.account_id)}</select>
-        <label class="fl">Kategori</label><input class="field" id="d-cat" value="${esc(draft.category || "")}" placeholder="mis. Makanan & Minuman" />
-      `}
-      <label class="fl">Catatan</label><input class="field" id="d-note" value="${esc(draft.note || "")}" />
-      <div class="btns"><button class="btn ghost" id="d-cancel">Batal</button><button class="btn primary" id="d-save">Simpan</button></div>`;
+      <div class="wave-static">${waveBars}</div>
+      <div class="transcript-line">${esc(draft.note || "")}</div>
+      <div class="draft-card">
+        <h4>Draft Transaksi (AI Extracted)</h4>
+        ${dupBanner}
+        <div class="draft-row"><span class="k">Jenis</span><div class="ctrl"><div class="seg2" id="seg">${types.map((t) => `<span data-t="${t}" class="${draft.type === t ? "on" : ""}">${TYPE_LABEL[t]}</span>`).join("")}</div></div></div>
+        <div class="draft-row"><span class="k">Nominal</span><div class="ctrl"><div class="num-wrap"><input id="d-amt" inputmode="numeric" value="${draft.amount || ""}" placeholder="0" /><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h3M8 18h3"/></svg></span></div></div></div>
+        ${isTransfer() ? `
+          <div class="draft-row"><span class="k">Dari akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-from">${accountOptions(draft.from_account_id)}</select>${CHEVRON}</div></div></div>
+          <div class="draft-row"><span class="k">Ke akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-to">${accountOptions(draft.to_account_id)}</select>${CHEVRON}</div></div></div>
+        ` : `
+          <div class="draft-row"><span class="k">Kategori</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${catIcon}</span><select id="d-cat">${categoryOptions(draft.category)}</select>${CHEVRON}</div></div></div>
+          <div class="draft-row"><span class="k">Akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-acc">${accountOptions(draft.account_id)}</select>${CHEVRON}</div></div></div>
+        `}
+        <div class="draft-row"><span class="k">Tanggal</span><div class="ctrl"><div class="num-wrap"><input type="date" id="d-date" value="${dateStr}" /><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></span></div></div></div>
+        <button class="btn block" id="d-save">KONFIRMASI &amp; SIMPAN</button>
+        <button class="btn-cancel" id="d-cancel">Batalkan</button>
+      </div>`;
     $("seg").querySelectorAll("span").forEach((s) => s.addEventListener("click", () => { syncFromInputs(); draft.type = s.dataset.t; render(); }));
-    $("d-amt").addEventListener("input", (e) => { const n = parseInt(e.target.value.replace(/\D/g, ""), 10); document.querySelector(".amount-big").textContent = rp(n || 0); });
+    $("d-amt").addEventListener("input", () => {});
+    const cat = $("d-cat"); if (cat) cat.addEventListener("change", () => { syncFromInputs(); render(); });
     $("d-cancel").addEventListener("click", closeSheet);
     $("d-save").addEventListener("click", saveDraft);
   };
   const syncFromInputs = () => {
     const amt = $("d-amt"); if (amt) draft.amount = parseInt(amt.value.replace(/\D/g, ""), 10) || 0;
-    const note = $("d-note"); if (note) draft.note = note.value;
+    const dt = $("d-date"); if (dt && dt.value) draft.occurred_at = dt.value + "T" + timeStr;
     if (!isTransfer()) { const c = $("d-cat"); if (c) draft.category = c.value; const a = $("d-acc"); if (a) draft.account_id = a.value; }
     else { const f = $("d-from"); if (f) draft.from_account_id = f.value; const t = $("d-to"); if (t) draft.to_account_id = t.value; }
   };

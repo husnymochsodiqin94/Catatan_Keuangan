@@ -128,6 +128,26 @@ label.fl{display:block;font-size:12px;color:var(--muted);margin:10px 2px 5px;fon
 .alert-banner.over{background:#fdecec;border-color:#f6c9c9;color:var(--out)}
 .alert-banner b{display:block}
 .alert-banner div div{font-size:12px;margin-top:1px}
+/* ---- Draft transaksi (gaya mockup) ---- */
+.wave-static{display:flex;align-items:center;justify-content:center;gap:4px;height:46px;margin:2px 0 4px}
+.wave-static i{width:4px;height:20%;border-radius:2px;background:var(--ai);opacity:.8}
+.transcript-line{text-align:center;font-size:17px;font-weight:600;margin:4px 12px 10px}
+.draft-card{background:#fff;border:1px solid #cfe9ee;border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(6,182,212,.10)}
+.draft-card h4{margin:0 0 14px;font-size:12px;color:var(--ai);text-transform:uppercase;letter-spacing:.06em;font-weight:800}
+.draft-row{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+.draft-row > .k{width:78px;font-size:13px;color:var(--muted);flex:none}
+.draft-row .ctrl{flex:1;min-width:0}
+.seg2{display:flex;gap:6px;flex-wrap:wrap}
+.seg2 span{font-size:12px;font-weight:700;padding:8px 12px;border-radius:999px;background:#f1f3f6;color:var(--muted);cursor:pointer}
+.seg2 span.on{background:rgba(16,185,129,.15);color:#0b7a55}
+.sel-wrap,.num-wrap{display:flex;align-items:center;gap:8px;background:#f3f6f8;border:1px solid var(--line);border-radius:12px;padding:0 12px}
+.sel-wrap .lead{color:var(--ai);flex:none;display:flex}
+.sel-wrap select{flex:1;min-width:0;border:none;background:transparent;padding:11px 4px;font-size:14px;font-weight:600;color:var(--ink);appearance:none;-webkit-appearance:none;outline:none;font-family:inherit}
+.sel-wrap .chev{flex:none}
+.num-wrap input{flex:1;min-width:0;border:none;background:transparent;padding:11px 0;font-size:15px;font-weight:700;color:var(--ink);outline:none;font-family:inherit}
+.num-wrap .ic{color:var(--muted);flex:none;display:flex}
+.btn.block{width:100%;margin-top:8px;background:var(--grad);color:#04231a;box-shadow:0 8px 20px rgba(6,182,212,.35)}
+.btn-cancel{display:block;width:100%;text-align:center;background:none;border:none;color:var(--muted);font-size:14px;padding:12px 0 2px;margin-top:4px;cursor:pointer;font-family:inherit}
 /* ---- Dashboard gaya mockup ---- */
 .hdr-icons{display:flex;gap:8px}
 .hicon{width:38px;height:38px;border-radius:11px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
