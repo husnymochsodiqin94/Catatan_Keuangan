@@ -152,6 +152,7 @@ _RULES: List[Tuple[str, str, str]] = [
     ("soccer", "Kesehatan & Olahraga", "Olahraga & Membership"),
     ("soker", "Kesehatan & Olahraga", "Olahraga & Membership"),
     ("sepak bola", "Kesehatan & Olahraga", "Olahraga & Membership"),
+    ("sepakbola", "Kesehatan & Olahraga", "Olahraga & Membership"),
     ("bola", "Kesehatan & Olahraga", "Olahraga & Membership"),
     ("badminton", "Kesehatan & Olahraga", "Olahraga & Membership"),
     ("bulutangkis", "Kesehatan & Olahraga", "Olahraga & Membership"),
