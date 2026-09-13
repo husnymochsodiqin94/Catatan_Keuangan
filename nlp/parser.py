@@ -40,6 +40,32 @@ REFUND_KEYWORDS = ("refund", "pengembalian", "dikembalikan", "retur")
 # Pemisah multi-transaksi. "lalu" dikecualikan bila bagian dari "hari lalu" (frasa tanggal).
 SPLIT_RE = re.compile(r"\s*(?:,|;|\bdan\b|\bkemudian\b|\bterus\b|(?<!hari )\blalu\b)\s+")
 
+# Nama bulan Indonesia (+ singkatan) -> nomor bulan.
+_MONTHS = {
+    "januari": 1, "jan": 1, "februari": 2, "pebruari": 2, "feb": 2,
+    "maret": 3, "mar": 3, "april": 4, "apr": 4, "mei": 5,
+    "juni": 6, "jun": 6, "juli": 7, "jul": 7,
+    "agustus": 8, "agu": 8, "ags": 8, "agt": 8, "agst": 8,
+    "september": 9, "sept": 9, "sep": 9, "oktober": 10, "okt": 10,
+    "november": 11, "nop": 11, "nov": 11, "desember": 12, "des": 12,
+}
+_MONTH_ALT = "|".join(sorted(map(re.escape, _MONTHS), key=len, reverse=True))
+# "25 agustus 2026" / "25 agu" (tahun opsional)
+_DATE_NAMED_RE = re.compile(rf"\b(\d{{1,2}})\s+({_MONTH_ALT})\.?(?:\s+(\d{{4}}))?\b", re.I)
+# "25/08/2026" / "25-8" (urutan Indonesia: hari/bulan[/tahun])
+_DATE_NUMERIC_RE = re.compile(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b")
+# "tanggal 25" (bulan berjalan)
+_DATE_TGL_RE = re.compile(r"\btanggal\s+(\d{1,2})\b", re.I)
+
+
+def _safe_date(year: int, month: Optional[int], day: int) -> Optional[date]:
+    if not month:
+        return None
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
 
 class RuleBasedParser:
     """Parser deterministik untuk bahasa Indonesia informal."""
@@ -130,8 +156,11 @@ class RuleBasedParser:
     )
 
     def _parse_amount(self, low: str) -> Optional[int]:
-        # buang token waktu dulu agar angka tanggal/jam tak salah jadi nominal
+        # buang token waktu & tanggal dulu agar angka tanggal/jam tak jadi nominal
         low = self._TEMPORAL_RE.sub(" ", low)
+        low = _DATE_NAMED_RE.sub(" ", low)
+        low = _DATE_NUMERIC_RE.sub(" ", low)
+        low = _DATE_TGL_RE.sub(" ", low)
         m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:juta|jt)\b", low)
         if m:
             return int(round(self._to_float(m.group(1)) * 1_000_000))
@@ -157,6 +186,7 @@ class RuleBasedParser:
     # Tanggal & waktu natural
     # ------------------------------------------------------------------ #
     def _parse_date(self, low: str, today: date) -> date:
+        # 1) Relatif
         m = re.search(r"(\d+)\s*hari\s*(?:yang\s*)?lalu", low)
         if m:
             return today - timedelta(days=int(m.group(1)))
@@ -166,6 +196,31 @@ class RuleBasedParser:
             return today - timedelta(days=1)
         if "besok" in low:
             return today + timedelta(days=1)
+        if "lusa" in low:
+            return today + timedelta(days=2)
+        # 2) Tanggal eksplisit dengan nama bulan: "25 agustus 2026"
+        m = _DATE_NAMED_RE.search(low)
+        if m:
+            day, mon = int(m.group(1)), _MONTHS.get(m.group(2).lower())
+            year = int(m.group(3)) if m.group(3) else today.year
+            d = _safe_date(year, mon, day)
+            if d:
+                return d
+        # 3) Tanggal numerik "25/08/2026" atau "25-8" (hari/bulan[/tahun])
+        m = _DATE_NUMERIC_RE.search(low)
+        if m:
+            day, mon = int(m.group(1)), int(m.group(2))
+            year = m.group(3)
+            year = (int(year) + 2000 if len(year) <= 2 else int(year)) if year else today.year
+            d = _safe_date(year, mon, day)
+            if d:
+                return d
+        # 4) "tanggal 25" -> bulan berjalan
+        m = _DATE_TGL_RE.search(low)
+        if m:
+            d = _safe_date(today.year, today.month, int(m.group(1)))
+            if d:
+                return d
         return today  # default: hari ini
 
     def _parse_time(self, low: str) -> Optional[time]:

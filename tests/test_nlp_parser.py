@@ -94,6 +94,25 @@ class TestNaturalDate(BaseCase):
         d = self.pipe.process("beli kopi 35 ribu pakai BCA", now=now)[0]
         self.assertEqual(d.parsed.date, date(2026, 9, 12))
 
+    def test_tanggal_eksplisit_nama_bulan(self):
+        now = datetime(2026, 9, 13, 10, 0, 0)
+        d = self.pipe.process("gaji 8 juta tanggal 25 agustus 2026 masuk BCA", now=now)[0]
+        self.assertEqual(d.parsed.date, date(2026, 8, 25))
+        self.assertEqual(d.parsed.amount, 8_000_000)   # 25/2026 tak jadi nominal
+        self.assertEqual(d.parsed.type, "income")
+
+    def test_tanggal_numerik(self):
+        now = datetime(2026, 9, 13, 10, 0, 0)
+        d = self.pipe.process("beli kopi 35rb 17/08/2026 pakai BCA", now=now)[0]
+        self.assertEqual(d.parsed.date, date(2026, 8, 17))
+        self.assertEqual(d.parsed.amount, 35_000)
+
+    def test_tanggal_bulan_berjalan(self):
+        now = datetime(2026, 9, 13, 10, 0, 0)
+        d = self.pipe.process("bayar listrik 100rb tanggal 5 pakai BCA", now=now)[0]
+        self.assertEqual(d.parsed.date, date(2026, 9, 5))
+        self.assertEqual(d.parsed.amount, 100_000)
+
 
 class TestIndonesianNominal(BaseCase):
     def test_variasi_nominal(self):
