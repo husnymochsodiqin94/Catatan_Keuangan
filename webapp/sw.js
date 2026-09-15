@@ -1,7 +1,8 @@
 /* Service worker: network-first untuk shell (selalu ambil terbaru saat online),
    fallback ke cache saat offline. /api tidak di-cache. */
-const CACHE = "ck-shell-v10";
-const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
+const CACHE = "ck-shell-v11";
+const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest",
+  "./icon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
