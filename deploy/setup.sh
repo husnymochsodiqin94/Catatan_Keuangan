@@ -52,5 +52,7 @@ docker compose up -d --build
 
 echo ""
 echo "Selesai. Buka:  https://${DOMAIN}"
-echo "PENTING: buka juga port 80 & 443 di Oracle Console (VCN > Security List / NSG),"
+echo "PENTING: buka juga port 80 & 443 di firewall cloud-mu"
+echo "         (GCP: VPC > Firewall / tag http-server & https-server;"
+echo "          Oracle: VCN > Security List / NSG),"
 echo "         dan pastikan ${DOMAIN} (DuckDNS) mengarah ke IP publik VM ini."
