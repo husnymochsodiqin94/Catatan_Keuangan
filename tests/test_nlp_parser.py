@@ -124,6 +124,11 @@ class TestIndonesianNominal(BaseCase):
             "beli hp 1,5 juta pakai BCA": 1_500_000,
             "beli makan 25.000 pakai BCA": 25_000,
             "belanja 1.250.000 pakai BCA": 1_250_000,
+            "beli rumah 1 miliar pakai BCA": 1_000_000_000,
+            "beli hp 1 koma 5 juta pakai BCA": 1_500_000,
+            "beli hp 2 juta 500 ribu pakai BCA": 2_500_000,
+            "beli kopi 35 rebu pakai BCA": 35_000,
+            "beli tanah 2,5 miliar pakai BCA": 2_500_000_000,
         }
         for text, expected in cases.items():
             with self.subTest(text=text):

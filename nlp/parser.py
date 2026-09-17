@@ -63,7 +63,8 @@ _NUM_WORDS = {
     "nol": 0, "kosong": 0, "satu": 1, "dua": 2, "tiga": 3, "empat": 4,
     "lima": 5, "enam": 6, "tujuh": 7, "delapan": 8, "sembilan": 9,
 }
-_GROUP_MULT = {"ribu": 1000, "juta": 1_000_000, "miliar": 1_000_000_000, "milyar": 1_000_000_000}
+_GROUP_MULT = {"ribu": 1000, "rebu": 1000, "juta": 1_000_000,
+               "miliar": 1_000_000_000, "milyar": 1_000_000_000}
 # "se-" yang menempel -> dipecah agar seragam (seratus -> satu ratus).
 _WORD_EXPAND = {
     "seratus": ["satu", "ratus"], "seribu": ["satu", "ribu"], "sejuta": ["satu", "juta"],
@@ -204,18 +205,31 @@ class RuleBasedParser:
         r"(?:jam|pukul)\s*\d{1,2}(?:[.:]\d{2})?"
     )
 
+    # magnitudo digit: (regex, pengali) — diproses & DIJUMLAHKAN semua
+    _MAG_PATTERNS = [
+        (re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:miliar|milyar)\b"), 1_000_000_000),
+        (re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:juta|jt)\b"), 1_000_000),
+        (re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:ribu|rebu|rb|k)\b"), 1_000),
+    ]
+
     def _parse_amount(self, low: str) -> Optional[int]:
         # buang token waktu & tanggal dulu agar angka tanggal/jam tak jadi nominal
         low = self._TEMPORAL_RE.sub(" ", low)
         low = _DATE_NAMED_RE.sub(" ", low)
         low = _DATE_NUMERIC_RE.sub(" ", low)
         low = _DATE_TGL_RE.sub(" ", low)
-        m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:juta|jt)\b", low)
-        if m:
-            return int(round(self._to_float(m.group(1)) * 1_000_000))
-        m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:ribu|rb|k)\b", low)
-        if m:
-            return int(round(self._to_float(m.group(1)) * 1_000))
+        # "1 koma 5 juta" -> "1.5 juta" (desimal ucapan)
+        low = re.sub(r"(\d+)\s+koma\s+(\d+)", r"\1.\2", low)
+        # Jumlahkan semua magnitudo: "2 juta 500 ribu" -> 2.5jt, "1 miliar" -> 1M
+        total = 0
+        found = False
+        for pat, mult in self._MAG_PATTERNS:
+            m = pat.search(low)
+            if m:
+                total += int(round(self._to_float(m.group(1)) * mult))
+                found = True
+        if found:
+            return total
         # angka dengan pemisah ribuan: 35.000 atau 1.250.000
         m = re.search(r"\b(\d{1,3}(?:\.\d{3})+)\b", low)
         if m:
