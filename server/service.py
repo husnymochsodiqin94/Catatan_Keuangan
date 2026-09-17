@@ -7,7 +7,9 @@ Tidak ada logika finansial yang diduplikasi di sini.
 
 from __future__ import annotations
 
+import os
 import re
+import threading
 from dataclasses import asdict
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -36,9 +38,38 @@ TWOFA_INTERVAL_DAYS = 14      # verifikasi email diminta paling sering per 14 ha
 TWOFA_CODE_TTL_MIN = 10       # kode OTP berlaku 10 menit
 DUPLICATE_WINDOW_SEC = 300    # proteksi duplikat: 5 menit
 
+# Rate limit anti brute-force (in-memory, cukup untuk 1 proses server).
+MAX_LOGIN_ATTEMPTS = 8
+LOGIN_WINDOW_MIN = 15
+_ATTEMPTS: Dict[str, list] = {}          # key -> [gagal, waktu_pertama]
+_ATTEMPTS_LOCK = threading.Lock()
+
 
 class AuthError(ValueError):
     """Kredensial/registrasi tidak valid."""
+
+
+def _rate_check(key: str, now: datetime) -> None:
+    """Blokir sementara bila terlalu banyak percobaan gagal dalam jendela waktu."""
+    with _ATTEMPTS_LOCK:
+        rec = _ATTEMPTS.get(key)
+        if rec and (now - rec[1]) <= timedelta(minutes=LOGIN_WINDOW_MIN):
+            if rec[0] >= MAX_LOGIN_ATTEMPTS:
+                raise AuthError("Terlalu banyak percobaan. Coba lagi dalam beberapa menit.")
+
+
+def _rate_fail(key: str, now: datetime) -> None:
+    with _ATTEMPTS_LOCK:
+        rec = _ATTEMPTS.get(key)
+        if not rec or (now - rec[1]) > timedelta(minutes=LOGIN_WINDOW_MIN):
+            _ATTEMPTS[key] = [1, now]
+        else:
+            rec[0] += 1
+
+
+def _rate_reset(key: str) -> None:
+    with _ATTEMPTS_LOCK:
+        _ATTEMPTS.pop(key, None)
 
 
 def _rp(n: int) -> str:
@@ -84,8 +115,19 @@ def _mask_email(email: str) -> str:
     return f"{head}{'*' * max(1, len(name) - len(head))}@{dom}"
 
 
-def _issue_twofa(storage: Storage, user: Dict[str, Any], now: datetime) -> Dict[str, Any]:
-    """Buat & kirim kode OTP; kembalikan payload 'twofa_required' (tanpa token)."""
+def _issue_twofa(storage: Storage, user: Dict[str, Any],
+                 now: datetime) -> Optional[Dict[str, Any]]:
+    """Buat & kirim kode OTP; kembalikan payload 'twofa_required' (tanpa token).
+
+    Mengembalikan None bila kode tak dapat dikirim (SMTP belum dikonfigurasi &
+    bukan mode dev) — pemanggil lalu melewati 2FA (tak membocorkan kode). Kode
+    hanya ditampilkan di respons bila env ``CATATAN_2FA_DEV`` diaktifkan.
+    """
+    dev = bool(os.environ.get("CATATAN_2FA_DEV"))
+    configured = email_alert.is_configured()
+    if not configured and not dev:
+        print(f"[2FA] SMTP belum dikonfigurasi; 2FA dilewati untuk {user['email']}")
+        return None
     code = auth.new_otp()
     expires = (now + timedelta(minutes=TWOFA_CODE_TTL_MIN)).isoformat(timespec="seconds")
     storage.set_twofa(user["id"], auth.hash_otp(code), expires)
@@ -96,16 +138,19 @@ def _issue_twofa(storage: Storage, user: Dict[str, Any], now: datetime) -> Dict[
     subject = "Kode Verifikasi Masuk — AI Financial Assistant"
     body = (f"Kode verifikasi masuk Anda: {code}\n"
             f"Berlaku {TWOFA_CODE_TTL_MIN} menit. Abaikan bila ini bukan Anda.")
-    if email_alert.is_configured():
+    if configured:
         try:
             email_alert.send_email(user["email"], subject, body)
             out["email_sent"] = True
         except Exception:
             out["email_sent"] = False
-            out["dev_code"] = code  # gagal kirim -> fallback tampilkan (lokal)
-    else:
-        # SMTP belum dikonfigurasi (mis. lokal): tampilkan kode agar tetap bisa masuk
-        print(f"[2FA] kode untuk {user['email']}: {code}")
+            if dev:
+                out["dev_code"] = code
+            else:
+                storage.delete_twofa(user["id"])
+                return None  # gagal kirim & bukan dev -> lewati 2FA, jangan bocor
+    else:  # mode dev tanpa SMTP: tampilkan kode untuk uji lokal
+        print(f"[2FA] kode dev untuk {user['email']}: {code}")
         out["email_sent"] = False
         out["dev_code"] = code
     return out
@@ -115,11 +160,17 @@ def login(storage: Storage, email: str, password: str,
           now: Optional[datetime] = None) -> Dict[str, Any]:
     now = now or datetime.now()
     email = (email or "").strip().lower()
+    _rate_check(email, now)
     user = storage.get_user_by_email(email)
     if not user or not auth.verify_password(password or "", user["password_hash"]):
+        _rate_fail(email, now)
         raise AuthError("email atau kata sandi salah")
+    _rate_reset(email)
     if not _twofa_fresh(user, now):
-        return _issue_twofa(storage, user, now)
+        chal = _issue_twofa(storage, user, now)
+        if chal is not None:
+            return chal
+        # tak dapat mengirim 2FA -> masuk dengan password saja
     token = storage.create_session(user["id"])
     return {"token": token, "user": _public_user(user)}
 
@@ -128,8 +179,11 @@ def verify_twofa(storage: Storage, email: str, code: str,
                  now: Optional[datetime] = None) -> Dict[str, Any]:
     now = now or datetime.now()
     email = (email or "").strip().lower()
+    key = email + ":2fa"
+    _rate_check(key, now)
     user = storage.get_user_by_email(email)
     if not user:
+        _rate_fail(key, now)
         raise AuthError("pengguna tidak ditemukan")
     rec = storage.get_twofa(user["id"])
     if not rec:
@@ -142,7 +196,9 @@ def verify_twofa(storage: Storage, email: str, code: str,
         storage.delete_twofa(user["id"])
         raise AuthError("kode kedaluwarsa, silakan masuk ulang")
     if not auth.verify_otp((code or "").strip(), rec["code_hash"]):
+        _rate_fail(key, now)
         raise AuthError("kode salah")
+    _rate_reset(key)
     storage.delete_twofa(user["id"])
     storage.set_last_2fa(user["id"], now.isoformat(timespec="seconds"))
     token = storage.create_session(user["id"])

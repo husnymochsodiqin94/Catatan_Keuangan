@@ -40,6 +40,28 @@ class TestAuth(unittest.TestCase):
         with self.assertRaises(AuthError):
             service.login(self.s, "a@b.com", "salah")
 
+    def test_rate_limit_login(self):
+        service.register(self.s, "rl@b.com", "secret1")
+        # Setelah MAX percobaan gagal -> terkunci sementara (pesan berbeda).
+        for _ in range(service.MAX_LOGIN_ATTEMPTS):
+            with self.assertRaises(AuthError):
+                service.login(self.s, "rl@b.com", "salah")
+        with self.assertRaises(AuthError) as ctx:
+            service.login(self.s, "rl@b.com", "secret1")  # password benar pun ditolak
+        self.assertIn("Terlalu banyak", str(ctx.exception))
+        service._rate_reset("rl@b.com")
+
+    def test_sesi_kedaluwarsa(self):
+        from datetime import datetime, timedelta
+        reg = service.register(self.s, "exp@b.com", "secret1")
+        tok = reg["token"]
+        self.assertIsNotNone(self.s.get_session_user(tok))
+        # Palsukan sesi lama (>30 hari) -> harus dianggap kedaluwarsa.
+        old = (datetime.now() - timedelta(days=31)).isoformat(timespec="seconds")
+        self.s._db.execute("UPDATE sessions SET created_at=? WHERE token=?", (old, tok))
+        self.s._db.commit()
+        self.assertIsNone(self.s.get_session_user(tok))
+
     def test_email_ganda_ditolak(self):
         service.register(self.s, "a@b.com", "secret1")
         with self.assertRaises(AuthError):
@@ -56,11 +78,14 @@ class TestAuth(unittest.TestCase):
         self.assertIsNone(self.s.get_session_user(reg["token"]))
 
     def test_2fa_setelah_14_hari(self):
+        import os
+        os.environ["CATATAN_2FA_DEV"] = "1"      # aktifkan kode dev utk uji lokal
+        self.addCleanup(os.environ.pop, "CATATAN_2FA_DEV", None)
         reg = service.register(self.s, "a@b.com", "secret1")
         uid = reg["user"]["id"]
         # dalam 14 hari: langsung dapat token
         self.assertIn("token", service.login(self.s, "a@b.com", "secret1"))
-        # >14 hari: minta 2FA (tanpa token), kode dikirim (dev_code karena SMTP off)
+        # >14 hari: minta 2FA (tanpa token), kode dikirim (dev_code karena mode dev)
         self.s.set_last_2fa(uid, (datetime.now() - timedelta(days=15)).isoformat())
         chal = service.login(self.s, "a@b.com", "secret1")
         self.assertTrue(chal.get("twofa_required"))

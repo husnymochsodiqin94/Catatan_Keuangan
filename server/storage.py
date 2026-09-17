@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+
+SESSION_TTL_DAYS = 30  # sesi kedaluwarsa setelah 30 hari
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -78,6 +80,10 @@ class Storage:
     def __init__(self, db_path: str = "data.db"):
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
+        # WAL + busy_timeout: aman untuk akses banyak thread (ThreadingHTTPServer)
+        # dan menghindari error "database is locked" saat tulis bersamaan.
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.execute("PRAGMA busy_timeout=5000")
         self._db.executescript(_SCHEMA)
         self._migrate()
         self._db.executescript(_INDEXES)
@@ -132,8 +138,19 @@ class Storage:
     def get_session_user(self, token: str) -> Optional[str]:
         if not token:
             return None
-        row = self._db.execute("SELECT user_id FROM sessions WHERE token=?", (token,)).fetchone()
-        return row["user_id"] if row else None
+        row = self._db.execute(
+            "SELECT user_id, created_at FROM sessions WHERE token=?", (token,)).fetchone()
+        if not row:
+            return None
+        try:
+            if datetime.now() - datetime.fromisoformat(row["created_at"]) > \
+                    timedelta(days=SESSION_TTL_DAYS):
+                self._db.execute("DELETE FROM sessions WHERE token=?", (token,))
+                self._db.commit()
+                return None
+        except (TypeError, ValueError):
+            pass
+        return row["user_id"]
 
     def delete_session(self, token: str) -> None:
         self._db.execute("DELETE FROM sessions WHERE token=?", (token,))
