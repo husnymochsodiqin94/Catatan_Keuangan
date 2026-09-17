@@ -31,6 +31,7 @@ from .storage import Storage
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "alert_threshold": 90, "alert_email": "",
     "spending_limit": None, "income_target": None, "category_budgets": [],
+    "recurring": [], "goals": [],
 }
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -441,16 +442,66 @@ def get_settings(storage: Storage, user_id: str) -> Dict[str, Any]:
 def update_settings(storage: Storage, user_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
     cur = storage.get_settings(user_id)
     for k in ("alert_threshold", "alert_email", "spending_limit",
-              "income_target", "category_budgets"):
+              "income_target", "category_budgets", "recurring", "goals"):
         if k in patch:
             cur[k] = patch[k]
     storage.save_settings(user_id, cur)
     return {**DEFAULT_SETTINGS, **cur}
 
 
+# --------------------------------------------------------------------- #
+# Tagihan berulang (recurring) + pengingat H-3
+# --------------------------------------------------------------------- #
+def _next_due(day: int, ref: datetime):
+    import calendar
+    from datetime import date as _date
+    y, m = ref.year, ref.month
+    for _ in range(13):
+        last = calendar.monthrange(y, m)[1]
+        cand = _date(y, m, min(max(day, 1), last))
+        if cand >= ref.date():
+            return cand
+        m += 1
+        if m == 13:
+            m = 1; y += 1
+    return None
+
+
+def upcoming_bills(storage: Storage, user_id: str, ref: Optional[datetime] = None,
+                   within_days: int = 14) -> List[Dict[str, Any]]:
+    ref = ref or datetime.now()
+    out: List[Dict[str, Any]] = []
+    for b in get_settings(storage, user_id).get("recurring") or []:
+        try:
+            day = int(b.get("day") or 1)
+        except (TypeError, ValueError):
+            continue
+        nd = _next_due(day, ref)
+        if not nd:
+            continue
+        days_left = (nd - ref.date()).days
+        if 0 <= days_left <= within_days:
+            out.append({**b, "next_date": nd.isoformat(), "days_left": days_left})
+    out.sort(key=lambda x: x["days_left"])
+    return out
+
+
 def budget_status(storage: Storage, user_id: str,
                   ref: Optional[datetime] = None) -> Dict[str, Any]:
-    return evaluate_budgets(build_engine(storage, user_id), get_settings(storage, user_id), ref)
+    ref = ref or datetime.now()
+    st = evaluate_budgets(build_engine(storage, user_id), get_settings(storage, user_id), ref)
+    # Pengingat tagihan berulang H-3
+    for b in upcoming_bills(storage, user_id, ref, within_days=3):
+        nm = b.get("name") or "Tagihan"
+        st["alerts"].append({
+            "kind": "reminder", "level": "warn",
+            "title": "Pengingat tagihan",
+            "message": (f"{nm} {_rp(b.get('amount', 0))} jatuh tempo "
+                        + ("hari ini." if b["days_left"] == 0
+                           else f"dalam {b['days_left']} hari.")),
+        })
+    st["upcoming"] = upcoming_bills(storage, user_id, ref, within_days=14)
+    return st
 
 
 def send_alerts(storage: Storage, user_id: str) -> Dict[str, Any]:

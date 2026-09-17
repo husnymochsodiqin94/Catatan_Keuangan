@@ -210,7 +210,13 @@ async function renderHome() {
     .map((a) => `<span><b>${rp(a.balance)}</b> (${esc(a.name)})</span>`).join("");
   const barData = cats.length ? cats.slice(0, 7) : [{ amount: 0 }, { amount: 0 }, { amount: 0 }];
   const bars = barData.map((c) => `<i style="height:${Math.max(14, Math.round((c.amount || 0) / cmax * 100))}%"></i>`).join("");
-  $("view").innerHTML = banner + `
+  const up = (bud.upcoming || [])[0];
+  const upCard = up ? `<div class="up-card">
+      <div class="grow"><div class="lbl">Tagihan mendatang</div>
+        <div class="nm">${esc(up.name)} · ${rp(up.amount)}</div>
+        <div class="muted" style="font-size:12px">${up.days_left === 0 ? "Jatuh tempo hari ini" : "Dalam " + up.days_left + " hari"} (tgl ${up.day})</div></div>
+      <button class="btn" id="up-catat" style="width:auto;padding:8px 14px">Catat</button></div>` : "";
+  $("view").innerHTML = banner + upCard + `
     <div class="saldo-card">
       <div class="t">Total Saldo</div>
       <div class="big">${rp(sum.total_balance)}</div>
@@ -224,10 +230,20 @@ async function renderHome() {
     <div class="sec">Transaksi Terakhir</div>
     <div id="recent">${(sum.recent || []).map(txCard).join("") || '<p class="muted">Belum ada transaksi.</p>'}</div>
     <div class="home-hint">Coba ucapkan: <b>"Beli kopi 35rb pakai BCA"</b></div>`;
+  const uc = $("up-catat"); if (uc && up) uc.addEventListener("click", () => catatBill(up));
   const rp_ = $("h-report"); if (rp_) rp_.addEventListener("click", () => go("reports"));
   const g = $("h-gear"); if (g) g.addEventListener("click", () => go("anggaran"));
   const b = $("h-bell"); if (b) b.addEventListener("click", () =>
     toast((bud.alerts && bud.alerts.length) ? bud.alerts[0].title : "Tidak ada notifikasi"));
+}
+
+async function catatBill(bill) {
+  if (!bill.account_id) return toast("Tagihan belum punya akun — atur di Anggaran", true);
+  if (!confirm(`Catat "${bill.name}" ${rp(bill.amount)} sekarang?`)) return;
+  const f = { type: bill.type || "expense", amount: bill.amount, account_id: bill.account_id,
+    category: bill.category || null, note: bill.name, allow_duplicate: true };
+  try { await api("POST", "/api/transactions", f); toast("Tagihan tercatat ✓"); go("home"); }
+  catch (e) { toast(e.message, true); }
 }
 
 function renderOnboarding() {
@@ -581,11 +597,118 @@ async function renderAnggaran() {
         <div class="bar"><i style="width:${Math.min(100, c.pct)}%;background:${barColor(c.pct, c.status === "over")}"></i></div></div>`;
     });
   } else { html += `<p class="muted">Belum ada anggaran kategori.</p>`; }
+
+  // --- Tagihan berulang ---
+  html += `<div class="sec">Tagihan Berulang <a data-add-rec style="cursor:pointer;color:var(--accent)">+ Tambah</a></div>`;
+  const rec = cfg.recurring || [];
+  if (rec.length) {
+    rec.forEach((b) => {
+      html += `<div class="row"><div class="ic">${b.type === "income" ? "＋" : "－"}</div>
+        <div class="grow"><div class="nm">${esc(b.name)}</div>
+          <div class="sub">Tiap tgl ${b.day} · ${b.type === "income" ? "Pemasukan" : "Pengeluaran"}${b.category ? " · " + esc(b.category) : ""}</div></div>
+        <span class="amt ${b.type === "income" ? "in" : "out"}">${rp(b.amount)}</span>
+        <button class="act" data-del-rec="${b.id}" title="Hapus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`;
+    });
+  } else { html += `<p class="muted">Belum ada tagihan berulang.</p>`; }
+
+  // --- Target tabungan (goals) ---
+  html += `<div class="sec">Target Tabungan <a data-add-goal style="cursor:pointer;color:var(--accent)">+ Tambah</a></div>`;
+  const goals = cfg.goals || [];
+  if (goals.length) {
+    goals.forEach((g) => {
+      const pct = g.target ? Math.min(100, Math.round((g.saved || 0) / g.target * 100)) : 0;
+      html += `<div class="card" style="margin-bottom:8px"><div class="bar-top"><span>${esc(g.name)}</span><span>${rp(g.saved || 0)} / ${rp(g.target)} · ${pct}%</span></div>
+        <div class="bar"><i style="width:${pct}%;background:var(--ai)"></i></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn ghost" style="flex:1;padding:9px" data-fund-goal="${g.id}">+ Tambah dana</button>
+          <button class="btn ghost" style="flex:0 0 auto;padding:9px 12px" data-del-goal="${g.id}">Hapus</button></div></div>`;
+    });
+  } else { html += `<p class="muted">Belum ada target tabungan.</p>`; }
+
   html += `<button class="btn ghost" id="open-settings" style="margin-top:14px">Atur Target &amp; Batas</button>`;
   $("view").innerHTML = html;
   $("open-settings").addEventListener("click", () => showSettings(cfg));
   const addc = $("view").querySelector("[data-add-cat]");
   if (addc) addc.addEventListener("click", () => showAddCategory(cfg));
+  const addr = $("view").querySelector("[data-add-rec]");
+  if (addr) addr.addEventListener("click", () => showRecurringSheet(cfg));
+  $("view").querySelectorAll("[data-del-rec]").forEach((b) =>
+    b.addEventListener("click", () => deleteRecurring(cfg, b.dataset.delRec)));
+  const addg = $("view").querySelector("[data-add-goal]");
+  if (addg) addg.addEventListener("click", () => showGoalSheet(cfg));
+  $("view").querySelectorAll("[data-fund-goal]").forEach((b) =>
+    b.addEventListener("click", () => fundGoal(cfg, b.dataset.fundGoal)));
+  $("view").querySelectorAll("[data-del-goal]").forEach((b) =>
+    b.addEventListener("click", () => deleteGoal(cfg, b.dataset.delGoal)));
+}
+
+const _newId = () => "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+async function showRecurringSheet(cfg) {
+  await loadCats();
+  if (!ACCOUNTS.length) { try { ACCOUNTS = await api("GET", "/api/accounts"); } catch (_) {} }
+  $("sheetBody").innerHTML = `<h3>Tagihan Berulang</h3>
+    <label class="fl">Nama</label><input class="field" id="rc-name" placeholder="mis. Netflix, Bayar Kost" />
+    <label class="fl">Nominal (Rp)</label><input class="field money" id="rc-amt" inputmode="numeric" />
+    <label class="fl">Jatuh tempo tiap tanggal (1–31)</label><input class="field" id="rc-day" inputmode="numeric" value="1" />
+    <label class="fl">Jenis</label><select class="field" id="rc-type"><option value="expense">Pengeluaran</option><option value="income">Pemasukan</option></select>
+    <label class="fl">Kategori</label><select class="field" id="rc-cat">${categoryOptions(null, "expense")}</select>
+    <label class="fl">Akun</label><select class="field" id="rc-acc">${accountOptions(null)}</select>
+    <div class="btns"><button class="btn ghost" id="rc-cancel">Batal</button><button class="btn primary" id="rc-save">Simpan</button></div>`;
+  openSheet();
+  $("rc-type").addEventListener("change", () => { $("rc-cat").innerHTML = categoryOptions(null, $("rc-type").value); });
+  $("rc-cancel").addEventListener("click", closeSheet);
+  $("rc-save").addEventListener("click", async () => {
+    const name = $("rc-name").value.trim();
+    const amt = parseInt(($("rc-amt").value || "").replace(/\D/g, ""), 10) || 0;
+    const day = Math.min(31, Math.max(1, parseInt($("rc-day").value || "1", 10) || 1));
+    if (!name || amt <= 0) return toast("Nama & nominal wajib diisi", true);
+    const list = (cfg.recurring || []).slice();
+    list.push({ id: _newId(), name, amount: amt, day, type: $("rc-type").value,
+      category: $("rc-cat").value || null, account_id: $("rc-acc").value || null });
+    try { await api("POST", "/api/settings", { recurring: list }); closeSheet(); toast("Tagihan disimpan"); go("anggaran"); }
+    catch (e) { toast(e.message, true); }
+  });
+}
+async function deleteRecurring(cfg, id) {
+  if (!confirm("Hapus tagihan berulang ini?")) return;
+  const list = (cfg.recurring || []).filter((b) => b.id !== id);
+  try { await api("POST", "/api/settings", { recurring: list }); toast("Dihapus"); go("anggaran"); }
+  catch (e) { toast(e.message, true); }
+}
+async function showGoalSheet(cfg) {
+  $("sheetBody").innerHTML = `<h3>Target Tabungan</h3>
+    <label class="fl">Nama target</label><input class="field" id="g-name" placeholder="mis. Dana Darurat, Liburan" />
+    <label class="fl">Target (Rp)</label><input class="field money" id="g-target" inputmode="numeric" />
+    <label class="fl">Sudah terkumpul (Rp)</label><input class="field money" id="g-saved" inputmode="numeric" value="0" />
+    <div class="btns"><button class="btn ghost" id="g-cancel">Batal</button><button class="btn primary" id="g-save">Simpan</button></div>`;
+  openSheet();
+  $("g-cancel").addEventListener("click", closeSheet);
+  $("g-save").addEventListener("click", async () => {
+    const name = $("g-name").value.trim();
+    const target = parseInt(($("g-target").value || "").replace(/\D/g, ""), 10) || 0;
+    const saved = parseInt(($("g-saved").value || "").replace(/\D/g, ""), 10) || 0;
+    if (!name || target <= 0) return toast("Nama & target wajib diisi", true);
+    const list = (cfg.goals || []).slice();
+    list.push({ id: _newId(), name, target, saved });
+    try { await api("POST", "/api/settings", { goals: list }); closeSheet(); toast("Target disimpan"); go("anggaran"); }
+    catch (e) { toast(e.message, true); }
+  });
+}
+async function fundGoal(cfg, id) {
+  const val = prompt("Tambah dana (Rp):");
+  if (val === null) return;
+  const add = parseInt(String(val).replace(/\D/g, ""), 10) || 0;
+  if (add <= 0) return;
+  const list = (cfg.goals || []).map((g) => g.id === id ? { ...g, saved: (g.saved || 0) + add } : g);
+  try { await api("POST", "/api/settings", { goals: list }); toast("Dana ditambahkan"); go("anggaran"); }
+  catch (e) { toast(e.message, true); }
+}
+async function deleteGoal(cfg, id) {
+  if (!confirm("Hapus target ini?")) return;
+  const list = (cfg.goals || []).filter((g) => g.id !== id);
+  try { await api("POST", "/api/settings", { goals: list }); toast("Dihapus"); go("anggaran"); }
+  catch (e) { toast(e.message, true); }
 }
 function showSettings(cfg) {
   const sl = cfg.spending_limit || {}, it = cfg.income_target || {};

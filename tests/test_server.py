@@ -193,6 +193,31 @@ class TestCategories(BaseCase):
         self.assertTrue(all(g["subcategories"] for g in cats["expense"]))
 
 
+class TestRecurring(BaseCase):
+    def test_upcoming_dan_reminder_h3(self):
+        ref = datetime(2026, 9, 17, 10)
+        service.update_settings(self.s, self.uid, {"recurring": [
+            {"id": "r1", "name": "Netflix", "amount": 186_000, "day": 19,
+             "type": "expense", "category": "Langganan Digital", "account_id": self.bca["id"]},
+            {"id": "r2", "name": "Kost", "amount": 1_000_000, "day": 1,
+             "type": "expense", "account_id": self.bca["id"]},
+        ]})
+        up = service.upcoming_bills(self.s, self.uid, ref, within_days=14)
+        names = [u["name"] for u in up]
+        self.assertIn("Netflix", names)   # tgl 19 -> 2 hari lagi
+        self.assertEqual([u for u in up if u["name"] == "Netflix"][0]["days_left"], 2)
+        # reminder H-3 muncul di alerts
+        st = service.budget_status(self.s, self.uid, ref)
+        self.assertTrue(any(a["kind"] == "reminder" for a in st["alerts"]))
+        self.assertIn("upcoming", st)
+
+    def test_goals_settings_roundtrip(self):
+        service.update_settings(self.s, self.uid, {"goals": [
+            {"id": "g1", "name": "Dana Darurat", "target": 10_000_000, "saved": 2_000_000}]})
+        cfg = service.get_settings(self.s, self.uid)
+        self.assertEqual(cfg["goals"][0]["target"], 10_000_000)
+
+
 class TestReportsExport(BaseCase):
     def _seed(self):
         service.create_transaction(self.s, self.uid, {"type": "income", "amount": 8_000_000,
