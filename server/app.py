@@ -47,6 +47,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _csv(self, text: str, filename: str) -> None:
+        body = text.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _read_json(self) -> dict:
         length = int(self.headers.get("Content-Length", 0) or 0)
         if not length:
@@ -104,6 +113,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(service.get_settings(_STORAGE, uid))
                 if path == "/api/budget":
                     return self._json(service.budget_status(_STORAGE, uid))
+                if path == "/api/reports":
+                    return self._json(service.reports(_STORAGE, uid, _int(qs, "months") or 6))
+                if path == "/api/transactions/export":
+                    return self._csv(service.export_csv(_STORAGE, uid), "transaksi.csv")
                 return self._json({"error": "not found"}, 404)
             return self._serve_static(path)
         except (AuthError,) as exc:

@@ -38,6 +38,20 @@ body{background:var(--bg);color:var(--ink);
 .bar-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
 .bar{height:9px;border-radius:999px;background:#e9ecf1;overflow:hidden}
 .bar>i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+/* ---- Laporan / tren ---- */
+.back{background:none;border:none;font-size:26px;line-height:1;color:var(--ink);cursor:pointer;padding:0 8px 0 0;font-family:inherit}
+.trend{display:flex;align-items:flex-end;gap:8px;height:140px;margin-top:12px}
+.tr-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
+.tr-bars{flex:1;display:flex;align-items:flex-end;gap:3px;width:100%;justify-content:center}
+.tr-bars i{width:9px;border-radius:4px 4px 0 0;min-height:2px}
+.tr-bars i.in{background:var(--accent)}
+.tr-bars i.out{background:var(--out,#ef4444)}
+.tr-lbl{font-size:11px;color:var(--muted);margin-top:6px}
+.legend{display:flex;gap:16px;justify-content:center;font-size:12px;color:var(--muted);margin-top:10px}
+.legend .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+.legend .dot.in{background:var(--accent)}
+.legend .dot.out{background:var(--out,#ef4444)}
+.cat-row{margin:10px 0}
 .row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 13px;margin-bottom:8px}
 .row .emoji,.row .ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:none;background:#eef0f3;color:var(--accent);font-weight:700}
 .row .grow{flex:1;min-width:0}

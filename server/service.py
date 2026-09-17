@@ -467,6 +467,67 @@ def send_alerts(storage: Storage, user_id: str) -> Dict[str, Any]:
 
 
 # --------------------------------------------------------------------- #
+# Laporan (Insight) — tren bulanan + rincian kategori, dari engine
+# --------------------------------------------------------------------- #
+_MONTH_ID = ["", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+             "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+
+
+def reports(storage: Storage, user_id: str, months: int = 6,
+            ref: Optional[datetime] = None) -> Dict[str, Any]:
+    """Tren income/expense/net beberapa bulan + rincian kategori bulan ref."""
+    e = build_engine(storage, user_id)
+    ref = ref or datetime.now()
+    months = max(1, min(int(months or 6), 24))
+    trend: List[Dict[str, Any]] = []
+    y, m = ref.year, ref.month
+    seq = []
+    for _ in range(months):
+        seq.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12; y -= 1
+    for (yy, mm) in reversed(seq):
+        cf = e.month_summary(yy, mm)
+        trend.append({
+            "year": yy, "month": mm, "label": f"{_MONTH_ID[mm]} {str(yy)[2:]}",
+            "income": cf["income"], "expense": cf["net_expense"],
+            "net": cf["net_cash_flow"],
+        })
+    cur = e.month_summary(ref.year, ref.month)
+    by = e.expense_by_category(cur["start"], cur["end"])
+    categories = sorted(({"category": k, "amount": v} for k, v in by.items()),
+                        key=lambda c: c["amount"], reverse=True)
+    total_exp = sum(c["amount"] for c in categories) or 1
+    for c in categories:
+        c["pct"] = round(c["amount"] / total_exp * 100)
+    # rata-rata pengeluaran bulanan (dari tren, abaikan bulan tanpa data)
+    exp_months = [t["expense"] for t in trend if t["expense"] > 0]
+    avg_expense = int(sum(exp_months) / len(exp_months)) if exp_months else 0
+    return {"trend": trend, "categories": categories,
+            "month_label": f"{_MONTH_ID[ref.month]} {ref.year}",
+            "avg_expense": avg_expense}
+
+
+def export_csv(storage: Storage, user_id: str) -> str:
+    """Ekspor seluruh transaksi user sebagai CSV (untuk unduh)."""
+    import csv
+    import io
+    e = build_engine(storage, user_id)
+    rows = transaction_views(e)
+    rows.sort(key=lambda r: r["date"], reverse=True)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["tanggal", "jenis", "kategori", "akun", "nominal", "catatan"])
+    label = {"income": "Pemasukan", "expense": "Pengeluaran",
+             "transfer": "Transfer", "refund": "Refund"}
+    for r in rows:
+        w.writerow([r["date"], label.get(r["type"], r["type"]), r.get("category") or "",
+                    r.get("account") or "", r["amount"], r.get("note") or ""])
+    return buf.getvalue()
+
+
+# --------------------------------------------------------------------- #
 def summary(storage: Storage, user_id: str, year: Optional[int] = None,
             month: Optional[int] = None) -> Dict[str, Any]:
     now = datetime.now()

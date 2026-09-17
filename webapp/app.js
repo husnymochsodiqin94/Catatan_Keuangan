@@ -156,6 +156,7 @@ async function render() {
   try {
     if (VIEW === "home") await renderHome();
     else if (VIEW === "history") await renderHistory();
+    else if (VIEW === "reports") await renderReports();
     else if (VIEW === "anggaran") await renderAnggaran();
     else if (VIEW === "accounts") await renderAccounts();
   } catch (e) {
@@ -167,6 +168,7 @@ async function render() {
 // ---- HOME ---------------------------------------------------------- //
 const GEAR_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.6 1.6 1.6 0 01-3 0 1.6 1.6 0 00-2.7-.6l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 004 15a1.6 1.6 0 00-1.5-1H2.4a2 2 0 010-4h.1A1.6 1.6 0 004 9a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6 1.6 1.6 0 0110.5 3a1.6 1.6 0 013 0 1.6 1.6 0 002.7.6l.1-.1a2 2 0 112.8 2.8l-.1.1A1.6 1.6 0 0020 9a1.6 1.6 0 001.5 1h.1a2 2 0 010 4h-.1a1.6 1.6 0 00-1.1 1z"/></svg>';
 const BELL_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
+const CHART_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>';
 function categoryIcon(cat, type) {
   const c = (cat || "").toLowerCase();
   const svg = (p) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>`;
@@ -193,7 +195,7 @@ async function renderHome() {
   ]);
   ACCOUNTS = accts;
   $("topbar").innerHTML = `<h1>Beranda</h1>
-    <span class="hdr-icons"><span class="hicon" id="h-gear" title="Anggaran">${GEAR_SVG}</span><span class="hicon" id="h-bell" title="Notifikasi">${BELL_SVG}</span></span>`;
+    <span class="hdr-icons"><span class="hicon" id="h-report" title="Laporan">${CHART_SVG}</span><span class="hicon" id="h-gear" title="Anggaran">${GEAR_SVG}</span><span class="hicon" id="h-bell" title="Notifikasi">${BELL_SVG}</span></span>`;
   const hasData = sum.income || sum.expense || (sum.recent && sum.recent.length) || accts.some((a) => a.balance);
   if (!hasData && accts.length === 0) return renderOnboarding();
 
@@ -222,6 +224,7 @@ async function renderHome() {
     <div class="sec">Transaksi Terakhir</div>
     <div id="recent">${(sum.recent || []).map(txCard).join("") || '<p class="muted">Belum ada transaksi.</p>'}</div>
     <div class="home-hint">Coba ucapkan: <b>"Beli kopi 35rb pakai BCA"</b></div>`;
+  const rp_ = $("h-report"); if (rp_) rp_.addEventListener("click", () => go("reports"));
   const g = $("h-gear"); if (g) g.addEventListener("click", () => go("anggaran"));
   const b = $("h-bell"); if (b) b.addEventListener("click", () =>
     toast((bud.alerts && bud.alerts.length) ? bud.alerts[0].title : "Tidak ada notifikasi"));
@@ -268,7 +271,9 @@ async function renderHistory() {
       <input id="hq" placeholder="Cari catatan / kategori…" value="${esc(histQ)}" />
     </div>
     <div class="chips">${chip("", "Semua")}${chip("expense", "Pengeluaran")}${chip("income", "Pemasukan")}${chip("transfer", "Transfer")}</div>
-    <div id="hlist">${rows.map(histRow).join("") || '<p class="muted">Tidak ada transaksi.</p>'}</div>`;
+    <div id="hlist">${rows.map(histRow).join("") || '<p class="muted">Tidak ada transaksi.</p>'}</div>
+    ${rows.length ? `<button class="btn ghost" id="h-export" style="margin-top:14px">⤓ Ekspor CSV</button>` : ""}`;
+  const ex = $("h-export"); if (ex) ex.addEventListener("click", downloadCSV);
   const q = $("hq");
   q.addEventListener("input", () => { histQ = q.value; clearTimeout(q._t); q._t = setTimeout(renderHistory, 250); });
   $("view").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { histType = c.dataset.t; renderHistory(); }));
@@ -335,6 +340,58 @@ async function delTx(id) {
   if (!confirm("Hapus transaksi ini?")) return;
   try { await api("DELETE", "/api/transactions/" + encodeURIComponent(id)); toast("Dihapus"); renderHistory(); }
   catch (e) { toast(e.message, true); }
+}
+
+async function downloadCSV() {
+  try {
+    const tok = getToken();
+    const res = await fetch("/api/transactions/export", { headers: tok ? { "X-Token": tok } : {} });
+    if (!res.ok) throw new Error("Gagal mengekspor");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "transaksi.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("CSV diunduh ✓");
+  } catch (e) { toast(e.message, true); }
+}
+
+// ---- REPORTS / LAPORAN --------------------------------------------- //
+async function renderReports() {
+  $("topbar").innerHTML = `<button class="back" id="rp-back">‹</button><h1>Laporan</h1>`;
+  $("rp-back").addEventListener("click", () => go("home"));
+  const rep = await api("GET", "/api/reports?months=6");
+  const trend = rep.trend || [];
+  const maxV = Math.max(1, ...trend.map((t) => Math.max(t.income, t.expense)));
+  const bars = trend.map((t) => `
+    <div class="tr-col">
+      <div class="tr-bars">
+        <i class="in" style="height:${Math.round(t.income / maxV * 100)}%" title="Masuk ${rp(t.income)}"></i>
+        <i class="out" style="height:${Math.round(t.expense / maxV * 100)}%" title="Keluar ${rp(t.expense)}"></i>
+      </div>
+      <div class="tr-lbl">${esc(t.label)}</div>
+    </div>`).join("");
+  const cats = rep.categories || [];
+  const cmax = Math.max(1, ...cats.map((c) => c.amount));
+  const catRows = cats.length ? cats.map((c) => `
+    <div class="cat-row">
+      <div class="bar-top"><span>${esc(c.category)}</span><span>${rp(c.amount)} · ${c.pct}%</span></div>
+      <div class="bar"><i style="width:${Math.round(c.amount / cmax * 100)}%"></i></div>
+    </div>`).join("") : '<p class="muted">Belum ada pengeluaran bulan ini.</p>';
+  $("view").innerHTML = `
+    <div class="card wide">
+      <div class="label">Tren 6 Bulan (masuk vs keluar)</div>
+      <div class="trend">${bars}</div>
+      <div class="legend"><span><i class="dot in"></i> Pemasukan</span><span><i class="dot out"></i> Pengeluaran</span></div>
+    </div>
+    <div class="spend-card" style="margin-top:12px">
+      <div class="spend-right"><div class="lbl">Rata-rata pengeluaran / bulan</div><div class="amt">${rp(rep.avg_expense)}</div></div>
+    </div>
+    <div class="sec">Pengeluaran per Kategori · ${esc(rep.month_label || "")}</div>
+    ${catRows}
+    <button class="btn ghost" id="rp-export" style="margin-top:14px">⤓ Ekspor CSV</button>`;
+  $("rp-export").addEventListener("click", downloadCSV);
 }
 
 // ---- ACCOUNTS ------------------------------------------------------ //

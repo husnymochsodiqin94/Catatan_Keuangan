@@ -193,6 +193,33 @@ class TestCategories(BaseCase):
         self.assertTrue(all(g["subcategories"] for g in cats["expense"]))
 
 
+class TestReportsExport(BaseCase):
+    def _seed(self):
+        service.create_transaction(self.s, self.uid, {"type": "income", "amount": 8_000_000,
+            "account_id": self.bca["id"], "occurred_at": datetime(2026, 9, 1, 9).isoformat()})
+        service.create_transaction(self.s, self.uid, {"type": "expense", "amount": 300_000,
+            "account_id": self.bca["id"], "category": "Makanan & Minuman",
+            "occurred_at": datetime(2026, 9, 5, 9).isoformat()})
+
+    def test_reports_trend_dan_kategori(self):
+        self._seed()
+        rep = service.reports(self.s, self.uid, months=6, ref=datetime(2026, 9, 17, 12))
+        self.assertEqual(len(rep["trend"]), 6)
+        self.assertEqual(rep["trend"][-1]["income"], 8_000_000)
+        self.assertEqual(rep["trend"][-1]["expense"], 300_000)
+        cats = {c["category"]: c for c in rep["categories"]}
+        self.assertIn("Makanan & Minuman", cats)
+        self.assertEqual(cats["Makanan & Minuman"]["amount"], 300_000)
+
+    def test_export_csv(self):
+        self._seed()
+        csv_text = service.export_csv(self.s, self.uid)
+        lines = csv_text.strip().splitlines()
+        self.assertEqual(lines[0], "tanggal,jenis,kategori,akun,nominal,catatan")
+        self.assertEqual(len(lines), 3)  # header + 2 transaksi
+        self.assertTrue(any("Pemasukan" in l and "8000000" in l for l in lines))
+
+
 class TestParse(BaseCase):
     def test_parse_resolve_akun(self):
         d = service.parse_text(self.s, self.uid, "beli kopi 35 ribu pakai BCA")["drafts"][0]
