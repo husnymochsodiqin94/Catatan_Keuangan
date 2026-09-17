@@ -58,6 +58,55 @@ _DATE_NUMERIC_RE = re.compile(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b")
 _DATE_TGL_RE = re.compile(r"\btanggal\s+(\d{1,2})\b", re.I)
 
 
+# --- Angka dalam bentuk kata (id) — fallback bila STT menuliskan huruf --------
+_NUM_WORDS = {
+    "nol": 0, "kosong": 0, "satu": 1, "dua": 2, "tiga": 3, "empat": 4,
+    "lima": 5, "enam": 6, "tujuh": 7, "delapan": 8, "sembilan": 9,
+}
+_GROUP_MULT = {"ribu": 1000, "juta": 1_000_000, "miliar": 1_000_000_000, "milyar": 1_000_000_000}
+# "se-" yang menempel -> dipecah agar seragam (seratus -> satu ratus).
+_WORD_EXPAND = {
+    "seratus": ["satu", "ratus"], "seribu": ["satu", "ribu"], "sejuta": ["satu", "juta"],
+    "semiliar": ["satu", "miliar"], "semilyar": ["satu", "miliar"],
+}
+_NUM_VOCAB = (set(_NUM_WORDS) | set(_GROUP_MULT) |
+              {"ratus", "belas", "puluh", "sepuluh", "sebelas", "setengah"} | set(_WORD_EXPAND))
+
+
+def _words_to_amount(low: str) -> Optional[int]:
+    """Konversi angka kata Indonesia -> rupiah. None bila tak ada.
+
+    Hanya diterima bila ada kata skala (ratus/ribu/juta/miliar) agar kata
+    seperti "satu"/"dua" biasa tidak salah dianggap nominal.
+    """
+    toks: List[str] = []
+    for w in re.findall(r"[a-z]+", low):
+        toks.extend(_WORD_EXPAND.get(w, [w]))
+    seq = [t for t in toks if t in _NUM_VOCAB]
+    if not any(t in _GROUP_MULT or t == "ratus" for t in seq):
+        return None
+    total = cur = num = 0.0
+    for t in seq:
+        if t in _NUM_WORDS:
+            num = _NUM_WORDS[t]
+        elif t == "setengah":
+            num += 0.5
+        elif t == "sepuluh":
+            cur += 10
+        elif t == "sebelas":
+            cur += 11
+        elif t == "belas":
+            cur += 10 + num; num = 0
+        elif t == "puluh":
+            cur += num * 10; num = 0
+        elif t == "ratus":
+            cur += (num or 1) * 100; num = 0
+        elif t in _GROUP_MULT:
+            total += ((cur + num) or 1) * _GROUP_MULT[t]; cur = num = 0
+    val = int(round(total + cur + num))
+    return val if val > 0 else None
+
+
 def _safe_date(year: int, month: Optional[int], day: int) -> Optional[date]:
     if not month:
         return None
@@ -175,7 +224,8 @@ class RuleBasedParser:
         m = re.search(r"\b(\d+)\b", low)
         if m:
             return int(m.group(1))
-        return None
+        # fallback: angka dalam bentuk kata ("lima puluh ribu", "dua juta")
+        return _words_to_amount(low)
 
     @staticmethod
     def _to_float(num: str) -> float:

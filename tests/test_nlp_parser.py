@@ -130,6 +130,27 @@ class TestIndonesianNominal(BaseCase):
                 d = self.pipe.process(text)[0]
                 self.assertEqual(d.parsed.amount, expected)
 
+    def test_nominal_bentuk_kata(self):
+        # STT kadang menuliskan angka sebagai KATA — harus tetap terbaca.
+        cases = {
+            "beli kopi lima puluh ribu pakai BCA": 50_000,
+            "bayar listrik seratus ribu pakai BCA": 100_000,
+            "beli pulsa lima belas ribu": 15_000,
+            "gaji dua juta lima ratus ribu masuk BCA": 2_500_000,
+            "beli baju seratus lima puluh ribu": 150_000,
+            "transfer setengah juta dari BCA ke Mandiri": 500_000,
+            "beli sepuluh ribu": 10_000,
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                d = self.pipe.process(text)[0]
+                self.assertEqual(d.parsed.amount, expected)
+
+    def test_tanpa_nominal_tidak_salah_deteksi(self):
+        # "satu"/"dua" tanpa skala tak boleh jadi nominal (butuh ratus/ribu/juta).
+        d = self.pipe.process("beli kopi pakai BCA")[0]
+        self.assertIsNone(d.parsed.amount)
+
 
 class TestTemporalNotAmount(BaseCase):
     """Regresi audit: angka pada frasa waktu tidak boleh dibaca sebagai nominal."""
