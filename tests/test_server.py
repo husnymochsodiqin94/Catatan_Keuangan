@@ -305,6 +305,31 @@ class TestDuplicateProtection(BaseCase):
         self.assertIn("transaction", res)
 
 
+class TestReceipt(BaseCase):
+    def test_lampirkan_lihat_hapus_struk(self):
+        res = service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 20_000, "account_id": self.bca["id"]})
+        tid = res["transaction"]["id"]
+        img = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
+        service.attach_receipt(self.s, self.uid, tid, img)
+        # muncul flag has_receipt di listing
+        row = [t for t in service.list_transactions(self.s, self.uid) if t["id"] == tid][0]
+        self.assertTrue(row["has_receipt"])
+        self.assertEqual(service.get_receipt(self.s, self.uid, tid)["data"], img)
+        service.delete_receipt(self.s, self.uid, tid)
+        with self.assertRaises(ValidationError):
+            service.get_receipt(self.s, self.uid, tid)
+
+    def test_tolak_non_gambar_dan_terlalu_besar(self):
+        res = service.create_transaction(self.s, self.uid, {
+            "type": "expense", "amount": 20_000, "account_id": self.bca["id"]})
+        tid = res["transaction"]["id"]
+        with self.assertRaises(ValidationError):
+            service.attach_receipt(self.s, self.uid, tid, "bukan gambar")
+        with self.assertRaises(ValidationError):
+            service.attach_receipt(self.s, self.uid, tid, "data:image/png;base64," + "A" * 2_000_000)
+
+
 class TestSplit(BaseCase):
     def test_split_membuat_beberapa_transaksi(self):
         res = service.create_split(self.s, self.uid, {

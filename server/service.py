@@ -439,11 +439,42 @@ def create_split(storage: Storage, user_id: str, f: Dict[str, Any],
             "summary": _summary_from_engine(e, occurred_at.year, occurred_at.month)}
 
 
+MAX_RECEIPT_CHARS = 1_500_000  # ~1.1 MB biner; klien wajib kompres dulu
+
+
+def attach_receipt(storage: Storage, user_id: str, tx_id: str, data: str) -> Dict[str, Any]:
+    if not any(t["id"] == tx_id for t in storage.list_transactions(user_id, include_deleted=True)):
+        raise ValidationError("transaksi tidak ditemukan")
+    data = data or ""
+    if not data.startswith("data:image/"):
+        raise ValidationError("format gambar tidak valid")
+    if len(data) > MAX_RECEIPT_CHARS:
+        raise ValidationError("gambar terlalu besar (maks ~1 MB, kompres dulu)")
+    storage.set_receipt(user_id, tx_id, data)
+    return {"ok": True}
+
+
+def get_receipt(storage: Storage, user_id: str, tx_id: str) -> Dict[str, Any]:
+    data = storage.get_receipt(user_id, tx_id)
+    if not data:
+        raise ValidationError("struk tidak ditemukan")
+    return {"data": data}
+
+
+def delete_receipt(storage: Storage, user_id: str, tx_id: str) -> Dict[str, Any]:
+    storage.delete_receipt(user_id, tx_id)
+    return {"ok": True}
+
+
 def list_transactions(storage: Storage, user_id: str, type: Optional[str] = None,
                       text: Optional[str] = None,
                       account_id: Optional[str] = None) -> List[Dict[str, Any]]:
     e = build_engine(storage, user_id)
-    return transaction_views(e, type=type, text=text, account_id=account_id)
+    views = transaction_views(e, type=type, text=text, account_id=account_id)
+    have = storage.receipt_ids(user_id)
+    for v in views:
+        v["has_receipt"] = v["id"] in have
+    return views
 
 
 def delete_transaction(storage: Storage, user_id: str, tx_id: str,

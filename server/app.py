@@ -117,6 +117,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(service.reports(_STORAGE, uid, _int(qs, "months") or 6))
                 if path == "/api/transactions/export":
                     return self._csv(service.export_csv(_STORAGE, uid), "transaksi.csv")
+                if path.startswith("/api/transactions/") and path.endswith("/receipt"):
+                    tx_id = path[len("/api/transactions/"):-len("/receipt")]
+                    return self._json(service.get_receipt(_STORAGE, uid, tx_id))
                 return self._json({"error": "not found"}, 404)
             return self._serve_static(path)
         except (AuthError,) as exc:
@@ -153,6 +156,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(service.create_transaction(_STORAGE, uid, data), 201)
             if path == "/api/transactions/split":
                 return self._json(service.create_split(_STORAGE, uid, data), 201)
+            if path.startswith("/api/transactions/") and path.endswith("/receipt"):
+                tx_id = path[len("/api/transactions/"):-len("/receipt")]
+                return self._json(service.attach_receipt(_STORAGE, uid, tx_id, data.get("data", "")), 201)
             if path == "/api/settings":
                 return self._json(service.update_settings(_STORAGE, uid, data))
             if path == "/api/alerts/send":
@@ -172,6 +178,9 @@ class Handler(BaseHTTPRequestHandler):
             uid = self._require_user(path)
             if uid is None:
                 return
+            if path.startswith("/api/transactions/") and path.endswith("/receipt"):
+                tx_id = path[len("/api/transactions/"):-len("/receipt")]
+                return self._json(service.delete_receipt(_STORAGE, uid, tx_id))
             if path.startswith("/api/transactions/"):
                 return self._json(service.delete_transaction(_STORAGE, uid, path[len("/api/transactions/"):]))
             if path.startswith("/api/accounts/"):

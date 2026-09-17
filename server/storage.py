@@ -63,6 +63,12 @@ CREATE TABLE IF NOT EXISTS user_settings (
     user_id TEXT PRIMARY KEY,
     data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS receipts (
+    tx_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 # Index dibuat SETELAH _migrate() agar DB lama (yang belum punya kolom
@@ -309,6 +315,32 @@ class Storage:
             "ON CONFLICT(user_id) DO UPDATE SET data=excluded.data", (user_id, payload))
         self._db.commit()
         return data
+
+    # ------------------------------------------------------------------ #
+    # Struk (foto) — base64 data URI, per transaksi
+    # ------------------------------------------------------------------ #
+    def set_receipt(self, user_id: str, tx_id: str, data: str) -> None:
+        self._db.execute(
+            "INSERT INTO receipts(tx_id,user_id,data,created_at) VALUES(?,?,?,?) "
+            "ON CONFLICT(tx_id) DO UPDATE SET data=excluded.data, created_at=excluded.created_at",
+            (tx_id, user_id, data, datetime.now().isoformat(timespec="seconds")))
+        self._db.commit()
+
+    def get_receipt(self, user_id: str, tx_id: str) -> Optional[str]:
+        row = self._db.execute(
+            "SELECT data FROM receipts WHERE tx_id=? AND user_id=?", (tx_id, user_id)).fetchone()
+        return row["data"] if row else None
+
+    def delete_receipt(self, user_id: str, tx_id: str) -> bool:
+        cur = self._db.execute(
+            "DELETE FROM receipts WHERE tx_id=? AND user_id=?", (tx_id, user_id))
+        self._db.commit()
+        return cur.rowcount > 0
+
+    def receipt_ids(self, user_id: str) -> set:
+        rows = self._db.execute(
+            "SELECT tx_id FROM receipts WHERE user_id=?", (user_id,)).fetchall()
+        return {r["tx_id"] for r in rows}
 
     def close(self) -> None:
         self._db.close()

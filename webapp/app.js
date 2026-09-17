@@ -296,6 +296,7 @@ async function renderHistory() {
   q.addEventListener("input", () => { histQ = q.value; clearTimeout(q._t); q._t = setTimeout(renderHistory, 250); });
   $("view").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { histType = c.dataset.t; renderHistory(); }));
   $("view").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => delTx(b.dataset.del)));
+  $("view").querySelectorAll("[data-rcpt]").forEach((b) => b.addEventListener("click", () => viewReceipt(b.dataset.rcpt)));
   $("view").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
     const t = HIST_ROWS.find((r) => r.id === b.dataset.edit); if (t) editSheet(t);
   }));
@@ -306,8 +307,9 @@ function histRow(t) {
   const label = esc(t.category || t.note || TYPE_LABEL[t.type] || t.type);
   const sub = esc([TYPE_LABEL[t.type] || t.type, t.account, t.date].filter(Boolean).join(" · "));
   return `<div class="row"><div class="ic">${iconFor(t.type)}</div>
-    <div class="grow"><div class="nm">${label}</div><div class="sub">${sub}</div></div>
+    <div class="grow"><div class="nm">${label}${t.has_receipt ? ' <span title="Ada struk">📎</span>' : ""}</div><div class="sub">${sub}</div></div>
     <span class="amt ${cls}">${sign}${rp(t.amount)}</span>
+    ${t.has_receipt ? `<button class="act" data-rcpt="${t.id}" title="Lihat struk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15l-5-5L5 21"/><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/></svg></button>` : ""}
     <button class="act" data-edit="${t.id}" title="Ubah"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
     <button class="act" data-del="${t.id}" title="Hapus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`;
 }
@@ -329,8 +331,34 @@ async function editSheet(t) {
     ${accRow}
     <label class="fl">Tanggal</label><input class="field" type="date" id="e-date" value="${dateStr}" />
     <label class="fl">Catatan</label><input class="field" id="e-note" value="${esc(t.note || "")}" />
+    <label class="fl">Foto Struk</label>
+    <div id="e-receipt-box">
+      ${t.has_receipt
+        ? `<div class="rcpt-wrap"><img id="e-rcpt-img" alt="struk" /><button class="btn ghost" id="e-rcpt-del" style="margin-top:8px">Hapus struk</button></div>`
+        : `<label class="btn ghost" style="display:block;text-align:center" for="e-rcpt-file">📷 Tambah foto struk</label>`}
+      <input type="file" id="e-rcpt-file" accept="image/*" capture="environment" hidden />
+    </div>
     <div class="btns"><button class="btn ghost" id="e-cancel">Batal</button><button class="btn primary" id="e-save">Simpan</button></div>`;
   openSheet();
+  // muat thumbnail struk bila ada
+  if (t.has_receipt) {
+    api("GET", "/api/transactions/" + encodeURIComponent(t.id) + "/receipt")
+      .then((r) => { const im = $("e-rcpt-img"); if (im) im.src = r.data; }).catch(() => {});
+    const rd = $("e-rcpt-del");
+    if (rd) rd.addEventListener("click", async () => {
+      try { await api("DELETE", "/api/transactions/" + encodeURIComponent(t.id) + "/receipt");
+        toast("Struk dihapus"); t.has_receipt = false; editSheet(t); } catch (e) { toast(e.message, true); }
+    });
+  }
+  const rf = $("e-rcpt-file");
+  if (rf) rf.addEventListener("change", async () => {
+    const file = rf.files && rf.files[0]; if (!file) return;
+    try {
+      const data = await compressImage(file);
+      await api("POST", "/api/transactions/" + encodeURIComponent(t.id) + "/receipt", { data });
+      toast("Struk disimpan ✓"); t.has_receipt = true; editSheet(t);
+    } catch (e) { toast(e.message || "Gagal memproses gambar", true); }
+  });
   $("e-cancel").addEventListener("click", closeSheet);
   $("e-save").addEventListener("click", async () => {
     const amt = parseInt(($("e-amt").value || "").replace(/\D/g, ""), 10) || 0;
@@ -358,6 +386,31 @@ async function delTx(id) {
   if (!confirm("Hapus transaksi ini?")) return;
   try { await api("DELETE", "/api/transactions/" + encodeURIComponent(id)); toast("Dihapus"); renderHistory(); }
   catch (e) { toast(e.message, true); }
+}
+
+function compressImage(file, maxDim = 1100, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      try { resolve(c.toDataURL("image/jpeg", quality)); } catch (e) { reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Gambar tidak valid")); };
+    img.src = url;
+  });
+}
+function viewReceipt(txId) {
+  api("GET", "/api/transactions/" + encodeURIComponent(txId) + "/receipt")
+    .then((r) => {
+      $("sheetBody").innerHTML = `<h3>Struk</h3><div class="rcpt-wrap"><img src="${r.data}" alt="struk" /></div>
+        <div class="btns"><button class="btn ghost" id="rv-close">Tutup</button></div>`;
+      $("rv-close").addEventListener("click", closeSheet); openSheet();
+    }).catch((e) => toast(e.message, true));
 }
 
 async function downloadCSV() {
