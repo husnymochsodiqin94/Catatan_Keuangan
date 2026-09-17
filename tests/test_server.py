@@ -183,14 +183,19 @@ class TestAccountEditDelete(BaseCase):
 
 class TestCategories(BaseCase):
     def test_listing_kategori(self):
-        cats = service.list_categories()
+        cats = service.list_categories(self.s, self.uid)
         self.assertIn("income", cats)
         self.assertIn("expense", cats)
         names = [g["category"] for g in cats["expense"]]
         self.assertIn("Makanan & Minuman", names)
         self.assertIn("Transportasi & Mobilitas", names)
-        # tiap kategori punya subkategori
-        self.assertTrue(all(g["subcategories"] for g in cats["expense"]))
+
+    def test_kategori_kustom_muncul(self):
+        service.update_settings(self.s, self.uid, {"custom_categories": [
+            {"type": "expense", "category": "Hobi Motor"}]})
+        cats = service.list_categories(self.s, self.uid)
+        names = [g["category"] for g in cats["expense"]]
+        self.assertIn("Hobi Motor", names)
 
 
 class TestRecurring(BaseCase):

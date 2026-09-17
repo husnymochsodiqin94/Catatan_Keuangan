@@ -26,7 +26,7 @@ _CONTENT_TYPES = {
     ".webmanifest": "application/manifest+json", ".json": "application/json",
     ".png": "image/png", ".ico": "image/x-icon",
 }
-_PUBLIC = {"/api/health", "/api/categories", "/api/auth/register",
+_PUBLIC = {"/api/health", "/api/auth/register",
            "/api/auth/login", "/api/auth/2fa/verify"}
 
 
@@ -93,8 +93,6 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/health":
                 return self._json({"ok": True})
-            if path == "/api/categories":
-                return self._json(service.list_categories())
             if path.startswith("/api/"):
                 uid = self._require_user(path)
                 if uid is None:
@@ -109,6 +107,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(service.list_transactions(
                         _STORAGE, uid, type=qs.get("type", [None])[0],
                         text=qs.get("q", [None])[0], account_id=qs.get("account_id", [None])[0]))
+                if path == "/api/categories":
+                    return self._json(service.list_categories(_STORAGE, uid))
                 if path == "/api/settings":
                     return self._json(service.get_settings(_STORAGE, uid))
                 if path == "/api/budget":

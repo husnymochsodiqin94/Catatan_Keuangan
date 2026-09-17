@@ -209,3 +209,29 @@ label.fl{display:block;font-size:12px;color:var(--muted);margin:10px 2px 5px;fon
   .cards{grid-template-columns:repeat(4,minmax(0,1fr))}
   .sheet-inner{max-width:520px;border-radius:20px;margin-bottom:24px}
 }
+
+/* ================= MODE GELAP ================= */
+:root[data-theme="dark"]{
+  --bg:#0f1720;--card:#18212c;--ink:#e5e9f0;--muted:#93a0b1;--line:#2a3644;
+  --warnbg:#3a2f10;
+}
+[data-theme="dark"] .nav,[data-theme="dark"] .field,[data-theme="dark"] .chip,
+[data-theme="dark"] .search,[data-theme="dark"] .sheet-inner,[data-theme="dark"] .hicon,
+[data-theme="dark"] .saldo-card,[data-theme="dark"] .spend-card,[data-theme="dark"] .card,
+[data-theme="dark"] .row,[data-theme="dark"] .period{background:var(--card);color:var(--ink)}
+[data-theme="dark"] .saldo-card{border-color:#123}
+[data-theme="dark"] .row .ic,[data-theme="dark"] .row .emoji,
+[data-theme="dark"] .row .tag,[data-theme="dark"] .seg2 span,
+[data-theme="dark"] .btn.ghost{background:#222c38;color:var(--ink)}
+[data-theme="dark"] .sel-wrap,[data-theme="dark"] .num-wrap{background:#222c38;border-color:var(--line)}
+[data-theme="dark"] .bar{background:#2a3644}
+[data-theme="dark"] .tx-card{border-bottom-color:#22303c}
+[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{color:var(--ink)}
+[data-theme="dark"] .up-card{background:#231d0f;border-color:#4a3a12}
+[data-theme="dark"] .banner,[data-theme="dark"] .alert-banner{background:#231d0f}
+[data-theme="dark"] input::placeholder{color:#6b7788}
+
+/* ================= PRIVACY BLUR ================= */
+body.privacy .amt,body.privacy .amt2,body.privacy .value,body.privacy .big,
+body.privacy .accs-inline b,body.privacy .bchip .v,body.privacy .v{
+  filter:blur(8px);transition:filter .12s}

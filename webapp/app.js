@@ -169,6 +169,7 @@ async function render() {
 const GEAR_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.6 1.6 1.6 0 01-3 0 1.6 1.6 0 00-2.7-.6l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 004 15a1.6 1.6 0 00-1.5-1H2.4a2 2 0 010-4h.1A1.6 1.6 0 004 9a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6 1.6 1.6 0 0110.5 3a1.6 1.6 0 013 0 1.6 1.6 0 002.7.6l.1-.1a2 2 0 112.8 2.8l-.1.1A1.6 1.6 0 0020 9a1.6 1.6 0 001.5 1h.1a2 2 0 010 4h-.1a1.6 1.6 0 00-1.1 1z"/></svg>';
 const BELL_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
 const CHART_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>';
+const EYE_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
 function categoryIcon(cat, type) {
   const c = (cat || "").toLowerCase();
   const svg = (p) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>`;
@@ -195,7 +196,7 @@ async function renderHome() {
   ]);
   ACCOUNTS = accts;
   $("topbar").innerHTML = `<h1>Beranda</h1>
-    <span class="hdr-icons"><span class="hicon" id="h-report" title="Laporan">${CHART_SVG}</span><span class="hicon" id="h-gear" title="Anggaran">${GEAR_SVG}</span><span class="hicon" id="h-bell" title="Notifikasi">${BELL_SVG}</span></span>`;
+    <span class="hdr-icons"><span class="hicon" id="h-eye" title="Sembunyikan saldo">${EYE_SVG}</span><span class="hicon" id="h-report" title="Laporan">${CHART_SVG}</span><span class="hicon" id="h-gear" title="Anggaran">${GEAR_SVG}</span><span class="hicon" id="h-bell" title="Notifikasi">${BELL_SVG}</span></span>`;
   const hasData = sum.income || sum.expense || (sum.recent && sum.recent.length) || accts.some((a) => a.balance);
   if (!hasData && accts.length === 0) return renderOnboarding();
 
@@ -230,6 +231,7 @@ async function renderHome() {
     <div class="sec">Transaksi Terakhir</div>
     <div id="recent">${(sum.recent || []).map(txCard).join("") || '<p class="muted">Belum ada transaksi.</p>'}</div>
     <div class="home-hint">Coba ucapkan: <b>"Beli kopi 35rb pakai BCA"</b></div>`;
+  const eye = $("h-eye"); if (eye) eye.addEventListener("click", togglePrivacy);
   const uc = $("up-catat"); if (uc && up) uc.addEventListener("click", () => catatBill(up));
   const rp_ = $("h-report"); if (rp_) rp_.addEventListener("click", () => go("reports"));
   const g = $("h-gear"); if (g) g.addEventListener("click", () => go("anggaran"));
@@ -429,8 +431,18 @@ async function renderAccounts() {
     <div>${active.map(acctRow).join("") || '<p class="muted">Belum ada akun.</p>'}</div>
     ${archived.length ? `<div class="sec">Diarsipkan</div>
       <div>${archived.map(acctRow).join("")}</div>` : ""}
-    <button class="btn primary" id="add-acc" style="margin-top:14px">+ Tambah Akun</button>`;
+    <button class="btn primary" id="add-acc" style="margin-top:14px">+ Tambah Akun</button>
+    <div class="sec">Preferensi</div>
+    <div class="row"><div class="grow"><div class="nm">Mode Gelap</div><div class="sub">Tema gelap untuk mata</div></div>
+      <button class="act-btn" id="pref-theme">${document.documentElement.getAttribute("data-theme") === "dark" ? "Aktif" : "Nonaktif"}</button></div>
+    <div class="row"><div class="grow"><div class="nm">Sembunyikan Saldo</div><div class="sub">Buramkan nominal (privasi)</div></div>
+      <button class="act-btn" id="pref-privacy">${document.body.classList.contains("privacy") ? "Aktif" : "Nonaktif"}</button></div>
+    <div class="row"><div class="grow"><div class="nm">Kelola Kategori</div><div class="sub">Tambah kategori sendiri</div></div>
+      <button class="act-btn" id="pref-cat">Atur</button></div>`;
   $("add-acc").addEventListener("click", showAddAccount);
+  $("pref-theme").addEventListener("click", toggleTheme);
+  $("pref-privacy").addEventListener("click", () => { togglePrivacy(); go("accounts"); });
+  $("pref-cat").addEventListener("click", showCategoryManager);
   const lo = $("logout");
   if (lo) lo.addEventListener("click", async () => {
     try { await api("POST", "/api/auth/logout"); } catch (_) {}
@@ -530,6 +542,47 @@ async function unarchiveAccount(a) {
     toast("Akun diaktifkan kembali"); go("accounts");
   } catch (e) { toast(e.message, true); }
 }
+async function showCategoryManager() {
+  let cfg = {};
+  try { cfg = await api("GET", "/api/settings"); } catch (_) {}
+  const custom = cfg.custom_categories || [];
+  const list = custom.length
+    ? custom.map((c, i) => `<div class="row"><div class="grow"><div class="nm">${esc(c.category)}</div>
+        <div class="sub">${c.type === "income" ? "Pemasukan" : "Pengeluaran"} · kustom</div></div>
+        <button class="act" data-del-cat="${i}" title="Hapus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`).join("")
+    : '<p class="muted">Belum ada kategori kustom.</p>';
+  $("sheetBody").innerHTML = `<h3>Kelola Kategori</h3>
+    <p class="muted" style="margin:0 0 10px">Tambah kategori sendiri di luar daftar bawaan.</p>
+    <label class="fl">Nama kategori</label><input class="field" id="cc-name" placeholder="mis. Hobi, Peliharaan" />
+    <label class="fl">Jenis</label><select class="field" id="cc-type"><option value="expense">Pengeluaran</option><option value="income">Pemasukan</option></select>
+    <button class="btn primary" id="cc-add" style="margin-top:10px">+ Tambah Kategori</button>
+    <div class="sec" style="margin-top:16px">Kategori Kustom</div>
+    ${list}
+    <div class="btns"><button class="btn ghost" id="cc-close">Tutup</button></div>`;
+  openSheet();
+  $("cc-close").addEventListener("click", closeSheet);
+  $("cc-add").addEventListener("click", async () => {
+    const name = $("cc-name").value.trim();
+    if (!name) return toast("Nama kategori wajib", true);
+    const arr = (cfg.custom_categories || []).slice();
+    if (arr.some((c) => c.category.toLowerCase() === name.toLowerCase()))
+      return toast("Kategori sudah ada", true);
+    arr.push({ type: $("cc-type").value, category: name });
+    try {
+      await api("POST", "/api/settings", { custom_categories: arr });
+      CATS = null;                    // paksa muat ulang daftar kategori
+      toast("Kategori ditambahkan"); showCategoryManager();
+    } catch (e) { toast(e.message, true); }
+  });
+  $("sheetBody").querySelectorAll("[data-del-cat]").forEach((b) => b.addEventListener("click", async () => {
+    const arr = (cfg.custom_categories || []).filter((_, i) => i !== parseInt(b.dataset.delCat, 10));
+    try {
+      await api("POST", "/api/settings", { custom_categories: arr });
+      CATS = null; toast("Dihapus"); showCategoryManager();
+    } catch (e) { toast(e.message, true); }
+  }));
+}
+
 function showAddAccount() {
   $("sheetBody").innerHTML = `<h3>Tambah Akun</h3>
     <label class="fl">Nama akun</label>
@@ -903,6 +956,28 @@ function qs(obj) {
   const p = Object.entries(obj).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`);
   return p.length ? "?" + p.join("&") : "";
 }
+
+// ---- preferensi tampilan (tema & privacy) -------------------------- //
+function applyPrefs() {
+  try {
+    const dark = localStorage.getItem("ck_theme") === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.body.classList.toggle("privacy", localStorage.getItem("ck_privacy") === "1");
+  } catch (_) {}
+}
+function toggleTheme() {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  try { localStorage.setItem("ck_theme", dark ? "light" : "dark"); } catch (_) {}
+  applyPrefs();
+  if (VIEW && VIEW !== "__auth") render();
+}
+function togglePrivacy() {
+  const on = document.body.classList.contains("privacy");
+  try { localStorage.setItem("ck_privacy", on ? "0" : "1"); } catch (_) {}
+  applyPrefs();
+  toast(on ? "Nominal ditampilkan" : "Nominal disembunyikan");
+}
+applyPrefs();
 
 // ---- boot ---------------------------------------------------------- //
 $("fab").addEventListener("click", async () => {

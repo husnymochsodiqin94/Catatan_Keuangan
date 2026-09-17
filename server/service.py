@@ -31,7 +31,7 @@ from .storage import Storage
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "alert_threshold": 90, "alert_email": "",
     "spending_limit": None, "income_target": None, "category_budgets": [],
-    "recurring": [], "goals": [],
+    "recurring": [], "goals": [], "custom_categories": [],
 }
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -311,8 +311,17 @@ def delete_account(storage: Storage, user_id: str, acc_id: str,
 # --------------------------------------------------------------------- #
 # Kategori (listing taksonomi — sumber kebenaran di nlp/taxonomy.py)
 # --------------------------------------------------------------------- #
-def list_categories() -> Dict[str, Any]:
-    return taxonomy.grouped()
+def list_categories(storage: Storage, user_id: str) -> Dict[str, Any]:
+    """Taksonomi bawaan + kategori kustom milik user (dari settings)."""
+    base = taxonomy.grouped()
+    out = {"income": list(base["income"]), "expense": list(base["expense"])}
+    for c in get_settings(storage, user_id).get("custom_categories") or []:
+        t = c.get("type") if c.get("type") in ("income", "expense") else "expense"
+        name = (c.get("category") or "").strip()
+        if name and not any(g["category"] == name for g in out[t]):
+            out[t].append({"category": name, "subcategories": c.get("subcategories") or [],
+                           "custom": True})
+    return out
 
 
 # --------------------------------------------------------------------- #
@@ -441,8 +450,8 @@ def get_settings(storage: Storage, user_id: str) -> Dict[str, Any]:
 
 def update_settings(storage: Storage, user_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
     cur = storage.get_settings(user_id)
-    for k in ("alert_threshold", "alert_email", "spending_limit",
-              "income_target", "category_budgets", "recurring", "goals"):
+    for k in ("alert_threshold", "alert_email", "spending_limit", "income_target",
+              "category_budgets", "recurring", "goals", "custom_categories"):
         if k in patch:
             cur[k] = patch[k]
     storage.save_settings(user_id, cur)
