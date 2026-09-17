@@ -476,9 +476,6 @@ async function renderAccounts() {
   const archived = accts.filter((a) => a.archived);
   const total = active.filter((a) => a.type !== "credit_card").reduce((s, a) => s + a.balance, 0);
   $("view").innerHTML = `
-    ${me ? `<div class="user-row"><div class="uav">${esc((me.display_name || me.email || "?")[0].toUpperCase())}</div>
-      <div class="grow"><div class="nm">${esc(me.display_name || "")}</div><div class="sub">${esc(me.email || "")}</div></div>
-      <button class="act-btn" id="logout">Keluar</button></div>` : ""}
     <div class="card hero balance"><div class="label">Total Saldo</div><div class="value">${rp(total)}</div></div>
     <div class="sec">Daftar Akun</div>
     <div>${active.map(acctRow).join("") || '<p class="muted">Belum ada akun.</p>'}</div>
@@ -491,7 +488,11 @@ async function renderAccounts() {
     <div class="row"><div class="grow"><div class="nm">Sembunyikan Saldo</div><div class="sub">Buramkan nominal (privasi)</div></div>
       <button class="act-btn" id="pref-privacy">${document.body.classList.contains("privacy") ? "Aktif" : "Nonaktif"}</button></div>
     <div class="row"><div class="grow"><div class="nm">Kelola Kategori</div><div class="sub">Tambah kategori sendiri</div></div>
-      <button class="act-btn" id="pref-cat">Atur</button></div>`;
+      <button class="act-btn" id="pref-cat">Atur</button></div>
+    <div class="sec">Akun Pengguna</div>
+    ${me ? `<div class="user-row"><div class="uav">${esc((me.display_name || me.email || "?")[0].toUpperCase())}</div>
+      <div class="grow"><div class="nm">${esc(me.display_name || "")}</div><div class="sub">${esc(me.email || "")}</div></div>
+      <button class="act-btn" id="logout">Keluar</button></div>` : ""}`;
   $("add-acc").addEventListener("click", showAddAccount);
   $("pref-theme").addEventListener("click", toggleTheme);
   $("pref-privacy").addEventListener("click", () => { togglePrivacy(); go("accounts"); });
@@ -930,7 +931,7 @@ function categoryOptions(sel, type) {
   let html = "";
   groups.forEach((g) => {
     seen.add(g.category);
-    let inner = opt(g.category, g.category + " — umum");
+    let inner = opt(g.category, "Umum");
     (g.subcategories || []).forEach((s) => { seen.add(s); inner += opt(s); });
     html += `<optgroup label="${esc(g.category)}">${inner}</optgroup>`;
   });

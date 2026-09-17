@@ -161,7 +161,7 @@ label.fl{display:block;font-size:12px;color:var(--muted);margin:10px 2px 5px;fon
 .seg2 span.on{background:rgba(16,185,129,.15);color:#0b7a55}
 .sel-wrap,.num-wrap{display:flex;align-items:center;gap:8px;background:#f3f6f8;border:1px solid var(--line);border-radius:12px;padding:0 12px}
 .sel-wrap .lead{color:var(--ai);flex:none;display:flex}
-.sel-wrap select{flex:1;min-width:0;border:none;background:transparent;padding:11px 4px;font-size:14px;font-weight:600;color:var(--ink);appearance:none;-webkit-appearance:none;outline:none;font-family:inherit}
+.sel-wrap select{flex:1;min-width:0;border:none;background:transparent;padding:11px 4px;font-size:13.5px;font-weight:600;color:var(--ink);appearance:none;-webkit-appearance:none;outline:none;font-family:inherit}
 .sel-wrap .chev{flex:none}
 .num-wrap input{flex:1;min-width:0;border:none;background:transparent;padding:11px 0;font-size:15px;font-weight:700;color:var(--ink);outline:none;font-family:inherit}
 .num-wrap .ic{color:var(--muted);flex:none;display:flex}
@@ -237,3 +237,10 @@ body.privacy .accs-inline b,body.privacy .bchip .v,body.privacy .v{
   filter:blur(8px);transition:filter .12s}
 .rcpt-wrap{text-align:center}
 .rcpt-wrap img{max-width:100%;max-height:60vh;border-radius:12px;border:1px solid var(--line)}
+
+/* Kontras mode gelap untuk kartu pengguna & tombol aksi + font dropdown */
+[data-theme="dark"] .user-row,[data-theme="dark"] .act-btn{background:var(--card);color:var(--ink)}
+[data-theme="dark"] .act-btn{color:var(--out)}
+select.field,.sel-wrap select{font-size:13.5px}
+select optgroup{font-size:13px;font-weight:700}
+select option{font-size:13.5px}
