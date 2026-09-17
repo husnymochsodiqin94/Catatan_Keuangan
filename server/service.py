@@ -404,6 +404,41 @@ def create_transaction(storage: Storage, user_id: str, f: Dict[str, Any],
     }
 
 
+def create_split(storage: Storage, user_id: str, f: Dict[str, Any],
+                 now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Satu pembayaran dibagi ke beberapa kategori -> beberapa transaksi."""
+    typ = f.get("type", "expense")
+    if typ not in ("expense", "income"):
+        raise ValidationError("split hanya untuk pengeluaran/pemasukan")
+    account_id = f.get("account_id")
+    occurred_at = _parse_dt(f.get("occurred_at")) or now or datetime.now()
+    note = f.get("note")
+    lines = [ln for ln in (f.get("lines") or [])
+             if isinstance(ln.get("amount"), int) and ln["amount"] > 0]
+    if len(lines) < 2:
+        raise ValidationError("minimal 2 baris split dengan nominal > 0")
+    e = build_engine(storage, user_id)
+    created: List[str] = []
+    for ln in lines:
+        cat = ln.get("category")
+        if typ == "expense":
+            tx = e.create_expense(ln["amount"], account_id, category=cat,
+                                  occurred_at=occurred_at, note=note, source="app")
+        else:
+            tx = e.create_income(ln["amount"], account_id, category=cat,
+                                 occurred_at=occurred_at, note=note, source="app")
+        row = storage.add_transaction(user_id, {
+            "type": tx.type.value, "amount": tx.amount,
+            "occurred_at": tx.occurred_at.isoformat(),
+            "from_account_id": tx.from_account_id, "to_account_id": tx.to_account_id,
+            "category": tx.category, "note": tx.note, "source": tx.source,
+        })
+        tx.id = row["id"]
+        created.append(tx.id)
+    return {"count": len(created),
+            "summary": _summary_from_engine(e, occurred_at.year, occurred_at.month)}
+
+
 def list_transactions(storage: Storage, user_id: str, type: Optional[str] = None,
                       text: Optional[str] = None,
                       account_id: Optional[str] = None) -> List[Dict[str, Any]]:

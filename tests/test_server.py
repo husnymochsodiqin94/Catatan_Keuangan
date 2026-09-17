@@ -305,6 +305,26 @@ class TestDuplicateProtection(BaseCase):
         self.assertIn("transaction", res)
 
 
+class TestSplit(BaseCase):
+    def test_split_membuat_beberapa_transaksi(self):
+        res = service.create_split(self.s, self.uid, {
+            "type": "expense", "account_id": self.bca["id"],
+            "occurred_at": datetime(2026, 9, 17, 10).isoformat(),
+            "note": "Belanja Indomaret",
+            "lines": [{"category": "Makanan & Minuman", "amount": 40_000},
+                      {"category": "Belanja Pribadi", "amount": 60_000}]})
+        self.assertEqual(res["count"], 2)
+        self.assertEqual(len(service.list_transactions(self.s, self.uid)), 2)
+        summ = service.summary(self.s, self.uid, 2026, 9)
+        self.assertEqual(summ["expense"], 100_000)          # 40rb + 60rb
+
+    def test_split_minimal_dua_baris(self):
+        with self.assertRaises(ValidationError):
+            service.create_split(self.s, self.uid, {
+                "type": "expense", "account_id": self.bca["id"],
+                "lines": [{"category": "X", "amount": 10_000}]})
+
+
 class TestSettingsBudgetEdit(BaseCase):
     def test_settings_roundtrip(self):
         service.update_settings(self.s, self.uid, {"alert_threshold": 80,

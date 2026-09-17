@@ -151,6 +151,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(service.parse_text(_STORAGE, uid, data.get("text", "")))
             if path == "/api/transactions":
                 return self._json(service.create_transaction(_STORAGE, uid, data), 201)
+            if path == "/api/transactions/split":
+                return self._json(service.create_split(_STORAGE, uid, data), 201)
             if path == "/api/settings":
                 return self._json(service.update_settings(_STORAGE, uid, data))
             if path == "/api/alerts/send":

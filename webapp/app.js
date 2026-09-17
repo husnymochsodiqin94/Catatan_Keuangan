@@ -916,12 +916,14 @@ function showConfirm(d) {
           <div class="draft-row"><span class="k">Akun</span><div class="ctrl"><div class="sel-wrap"><span class="lead">${CARD_SVG}</span><select id="d-acc">${accountOptions(draft.account_id)}</select>${CHEVRON}</div></div></div>
         `}
         <div class="draft-row"><span class="k">Tanggal</span><div class="ctrl"><div class="num-wrap"><input type="date" id="d-date" value="${dateStr}" /><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></span></div></div></div>
+        ${isTransfer() ? "" : `<div style="text-align:center;margin:6px 0 2px"><a id="d-split" style="cursor:pointer;color:var(--ai);font-size:13px;font-weight:600">✂ Bagi ke beberapa kategori</a></div>`}
         <button class="btn block" id="d-save">KONFIRMASI &amp; SIMPAN</button>
         <button class="btn-cancel" id="d-cancel">Batalkan</button>
       </div>`;
     $("seg").querySelectorAll("span").forEach((s) => s.addEventListener("click", () => { syncFromInputs(); draft.type = s.dataset.t; render(); }));
     $("d-amt").addEventListener("input", () => {});
     const cat = $("d-cat"); if (cat) cat.addEventListener("change", () => { syncFromInputs(); render(); });
+    const spl = $("d-split"); if (spl) spl.addEventListener("click", () => { syncFromInputs(); showSplit(draft); });
     $("d-cancel").addEventListener("click", closeSheet);
     $("d-save").addEventListener("click", saveDraft);
   };
@@ -949,6 +951,56 @@ function showConfirm(d) {
       closeSheet(); toast("Tercatat ✓"); go("home");
     } catch (e) { toast(e.message, true); }
   }
+}
+
+// ---- SPLIT (bagi 1 pembayaran ke banyak kategori) ------------------ //
+function showSplit(d) {
+  const type = d.type === "income" ? "income" : "expense";
+  const total = d.amount || 0;
+  let lines = [
+    { category: d.category || null, amount: total },
+    { category: null, amount: 0 },
+  ];
+  const render = () => {
+    const sum = lines.reduce((s, l) => s + (l.amount || 0), 0);
+    const rem = total - sum;
+    const rows = lines.map((l, i) => `
+      <div class="draft-row"><div class="ctrl" style="gap:8px">
+        <div class="sel-wrap" style="flex:1"><select data-cat="${i}">${categoryOptions(l.category, type)}</select>${CHEVRON}</div>
+        <div class="num-wrap" style="flex:0 0 120px"><input class="money" data-amt="${i}" inputmode="numeric" value="${l.amount ? groupDigits(l.amount) : ""}" placeholder="0" /></div>
+        ${lines.length > 2 ? `<button class="act" data-rm="${i}" title="Hapus">✕</button>` : ""}
+      </div></div>`).join("");
+    $("sheetBody").innerHTML = `<h3>Bagi ke Beberapa Kategori</h3>
+      <p class="muted" style="margin:0 0 10px">Total ${rp(total)} · ${type === "income" ? "Pemasukan" : "Pengeluaran"}. Bagi nominal ke tiap kategori.</p>
+      ${rows}
+      <a id="sp-add" style="cursor:pointer;color:var(--ai);font-size:13px;font-weight:600">+ Tambah baris</a>
+      <div class="draft-row" style="margin-top:8px"><span class="k">Sisa</span>
+        <div class="ctrl"><b style="color:${rem === 0 ? "var(--in)" : "var(--out)"}">${rp(rem)}</b></div></div>
+      <button class="btn block" id="sp-save" ${rem === 0 ? "" : "disabled"}>SIMPAN SPLIT</button>
+      <button class="btn-cancel" id="sp-back">Kembali</button>`;
+    const sync = () => {
+      $("sheetBody").querySelectorAll("[data-cat]").forEach((s) => { lines[+s.dataset.cat].category = s.value || null; });
+      $("sheetBody").querySelectorAll("[data-amt]").forEach((a) => { lines[+a.dataset.amt].amount = parseInt(a.value.replace(/\D/g, ""), 10) || 0; });
+    };
+    $("sheetBody").querySelectorAll("[data-amt]").forEach((a) => a.addEventListener("input", () => { sync(); const s = lines.reduce((x, l) => x + l.amount, 0); const btn = $("sp-save"); const ok = (total - s) === 0; btn.disabled = !ok; }));
+    $("sheetBody").querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => { sync(); lines.splice(+b.dataset.rm, 1); render(); }));
+    $("sp-add").addEventListener("click", () => { sync(); lines.push({ category: null, amount: 0 }); render(); });
+    $("sp-back").addEventListener("click", () => showConfirm(d));
+    $("sp-save").addEventListener("click", async () => {
+      sync();
+      const valid = lines.filter((l) => l.amount > 0);
+      if (valid.length < 2) return toast("Minimal 2 baris berisi nominal", true);
+      if (!d.account_id) return toast("Pilih akun dulu", true);
+      try {
+        await api("POST", "/api/transactions/split", {
+          type, account_id: d.account_id, occurred_at: d.occurred_at,
+          note: d.note || null, lines: valid,
+        });
+        closeSheet(); toast(`Tersimpan ${valid.length} transaksi ✓`); go("home");
+      } catch (e) { toast(e.message, true); }
+    });
+  };
+  render();
 }
 
 // ---- helpers ------------------------------------------------------- //
