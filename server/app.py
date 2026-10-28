@@ -27,7 +27,8 @@ _CONTENT_TYPES = {
     ".png": "image/png", ".ico": "image/x-icon",
 }
 _PUBLIC = {"/api/health", "/api/auth/register",
-           "/api/auth/login", "/api/auth/2fa/verify"}
+           "/api/auth/login", "/api/auth/2fa/verify",
+           "/api/auth/forgot", "/api/auth/reset"}
 
 
 def _int(qs: dict, key: str):
@@ -141,6 +142,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/auth/2fa/verify":
                 return self._json(service.verify_twofa(
                     _STORAGE, data.get("email"), data.get("code")))
+            if path == "/api/auth/forgot":
+                return self._json(service.request_password_reset(
+                    _STORAGE, data.get("email")))
+            if path == "/api/auth/reset":
+                return self._json(service.reset_password(
+                    _STORAGE, data.get("email"), data.get("code"),
+                    data.get("new_password")))
             uid = self._require_user(path)
             if uid is None:
                 return

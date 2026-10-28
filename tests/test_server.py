@@ -100,6 +100,74 @@ class TestAuth(unittest.TestCase):
         self.assertIn("token", service.login(self.s, "a@b.com", "secret1"))
 
 
+class TestPasswordReset(unittest.TestCase):
+    def setUp(self):
+        import os
+        self.s = Storage(":memory:")
+        service._ATTEMPTS.clear()                 # isolasi rate-limit antar test
+        os.environ["CATATAN_2FA_DEV"] = "1"       # aktifkan kode dev utk uji
+        self.addCleanup(os.environ.pop, "CATATAN_2FA_DEV", None)
+
+    def tearDown(self):
+        self.s.close()
+
+    def test_reset_sandi_berhasil(self):
+        service.register(self.s, "r@b.com", "lamaaa1")
+        req = service.request_password_reset(self.s, "r@b.com")
+        self.assertTrue(req.get("sent"))
+        self.assertEqual(len(req["dev_code"]), 6)
+        out = service.reset_password(self.s, "r@b.com", req["dev_code"], "baruuu1")
+        self.assertTrue(out.get("ok"))
+        # sandi lama gagal, sandi baru berhasil
+        with self.assertRaises(AuthError):
+            service.login(self.s, "r@b.com", "lamaaa1")
+        self.assertIn("token", service.login(self.s, "r@b.com", "baruuu1"))
+
+    def test_sesi_lama_dicabut_setelah_reset(self):
+        reg = service.register(self.s, "r@b.com", "lamaaa1")
+        tok = reg["token"]
+        self.assertIsNotNone(self.s.get_session_user(tok))
+        req = service.request_password_reset(self.s, "r@b.com")
+        service.reset_password(self.s, "r@b.com", req["dev_code"], "baruuu1")
+        self.assertIsNone(self.s.get_session_user(tok))  # sesi lama invalid
+
+    def test_kode_salah_ditolak(self):
+        service.register(self.s, "r@b.com", "lamaaa1")
+        service.request_password_reset(self.s, "r@b.com")
+        with self.assertRaises(AuthError):
+            service.reset_password(self.s, "r@b.com", "000000", "baruuu1")
+
+    def test_kode_kedaluwarsa_ditolak(self):
+        reg = service.register(self.s, "r@b.com", "lamaaa1")
+        req = service.request_password_reset(self.s, "r@b.com")
+        old = (datetime.now() - timedelta(minutes=20)).isoformat(timespec="seconds")
+        self.s._db.execute("UPDATE password_resets SET expires_at=? WHERE user_id=?",
+                           (old, reg["user"]["id"]))
+        self.s._db.commit()
+        with self.assertRaises(AuthError):
+            service.reset_password(self.s, "r@b.com", req["dev_code"], "baruuu1")
+
+    def test_sandi_baru_pendek_ditolak(self):
+        service.register(self.s, "r@b.com", "lamaaa1")
+        req = service.request_password_reset(self.s, "r@b.com")
+        with self.assertRaises(AuthError):
+            service.reset_password(self.s, "r@b.com", req["dev_code"], "123")
+
+    def test_email_tak_terdaftar_tak_bocor(self):
+        # Tidak ada user: tetap balas sent=True (anti enumeration), tanpa dev_code.
+        out = service.request_password_reset(self.s, "nouser@b.com")
+        self.assertTrue(out.get("sent"))
+        self.assertNotIn("dev_code", out)
+
+    def test_smtp_off_tanpa_dev(self):
+        import os
+        os.environ.pop("CATATAN_2FA_DEV", None)   # matikan dev utk kasus ini
+        service.register(self.s, "r@b.com", "lamaaa1")
+        out = service.request_password_reset(self.s, "r@b.com")
+        self.assertFalse(out.get("sent"))
+        self.assertTrue(out.get("smtp_off"))
+
+
 class TestIsolation(BaseCase):
     def test_data_terpisah_per_user(self):
         service.create_transaction(self.s, self.uid, {

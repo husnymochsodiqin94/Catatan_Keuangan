@@ -37,6 +37,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 TWOFA_INTERVAL_DAYS = 14      # verifikasi email diminta paling sering per 14 hari
 TWOFA_CODE_TTL_MIN = 10       # kode OTP berlaku 10 menit
+RESET_CODE_TTL_MIN = 15       # kode reset kata sandi berlaku 15 menit
 DUPLICATE_WINDOW_SEC = 300    # proteksi duplikat: 5 menit
 
 # Rate limit anti brute-force (in-memory, cukup untuk 1 proses server).
@@ -204,6 +205,77 @@ def verify_twofa(storage: Storage, email: str, code: str,
     storage.set_last_2fa(user["id"], now.isoformat(timespec="seconds"))
     token = storage.create_session(user["id"])
     return {"token": token, "user": _public_user(user)}
+
+
+def request_password_reset(storage: Storage, email: str,
+                           now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Kirim kode reset ke email. Tidak membocorkan apakah email terdaftar.
+
+    - SMTP belum dikonfigurasi & bukan mode dev → ``{"sent": False, "smtp_off": True}``
+      (fitur butuh email server; jujur, tapi tak bergantung email tertentu).
+    - Selain itu selalu ``{"sent": True, ...}`` baik email ada atau tidak
+      (anti account-enumeration); kode hanya benar-benar dibuat bila user ada.
+    """
+    now = now or datetime.now()
+    email = (email or "").strip().lower()
+    dev = bool(os.environ.get("CATATAN_2FA_DEV"))
+    configured = email_alert.is_configured()
+    if not configured and not dev:
+        return {"sent": False, "smtp_off": True}
+
+    _rate_check(email + ":reset", now)
+    out: Dict[str, Any] = {"sent": True, "email": _mask_email(email),
+                           "expires_in_min": RESET_CODE_TTL_MIN}
+    user = storage.get_user_by_email(email)
+    if not user:
+        return out  # jangan bocorkan bahwa email tak ada
+    code = auth.new_otp()
+    expires = (now + timedelta(minutes=RESET_CODE_TTL_MIN)).isoformat(timespec="seconds")
+    storage.set_reset(user["id"], auth.hash_otp(code), expires)
+    subject = "Kode Reset Kata Sandi — AI Financial Assistant"
+    body = (f"Kode reset kata sandi Anda: {code}\n"
+            f"Berlaku {RESET_CODE_TTL_MIN} menit. Abaikan bila ini bukan Anda.")
+    if configured:
+        try:
+            email_alert.send_email(user["email"], subject, body)
+        except Exception:
+            if dev:
+                out["dev_code"] = code
+    else:  # mode dev tanpa SMTP: tampilkan kode untuk uji lokal
+        print(f"[reset] kode dev untuk {user['email']}: {code}")
+        out["dev_code"] = code
+    return out
+
+
+def reset_password(storage: Storage, email: str, code: str, new_password: str,
+                   now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Verifikasi kode reset lalu ganti kata sandi; cabut semua sesi lama."""
+    now = now or datetime.now()
+    email = (email or "").strip().lower()
+    if not new_password or len(new_password) < 6:
+        raise AuthError("kata sandi minimal 6 karakter")
+    key = email + ":reset"
+    _rate_check(key, now)
+    user = storage.get_user_by_email(email)
+    rec = storage.get_reset(user["id"]) if user else None
+    if not user or not rec:
+        _rate_fail(key, now)
+        raise AuthError("kode tidak valid, minta kode baru")
+    try:
+        expired = datetime.fromisoformat(rec["expires_at"]) < now
+    except (TypeError, ValueError):
+        expired = True
+    if expired:
+        storage.delete_reset(user["id"])
+        raise AuthError("kode kedaluwarsa, minta kode baru")
+    if not auth.verify_otp((code or "").strip(), rec["code_hash"]):
+        _rate_fail(key, now)
+        raise AuthError("kode salah")
+    _rate_reset(key)
+    storage.update_password(user["id"], auth.hash_password(new_password))
+    storage.delete_reset(user["id"])
+    storage.delete_sessions_for_user(user["id"])  # paksa login ulang di semua perangkat
+    return {"ok": True}
 
 
 def logout(storage: Storage, token: str) -> Dict[str, Any]:

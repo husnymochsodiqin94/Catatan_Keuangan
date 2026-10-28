@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS twofa_codes (
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS password_resets (
+    user_id TEXT PRIMARY KEY,
+    code_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
     user_id TEXT,
@@ -182,6 +188,34 @@ class Storage:
 
     def delete_twofa(self, user_id: str) -> None:
         self._db.execute("DELETE FROM twofa_codes WHERE user_id=?", (user_id,))
+        self._db.commit()
+
+    # ---- Reset kata sandi (lupa sandi) ---- #
+    def set_reset(self, user_id: str, code_hash: str, expires_at: str) -> None:
+        self._db.execute(
+            "INSERT INTO password_resets(user_id,code_hash,expires_at,created_at) VALUES(?,?,?,?) "
+            "ON CONFLICT(user_id) DO UPDATE SET code_hash=excluded.code_hash, "
+            "expires_at=excluded.expires_at, created_at=excluded.created_at",
+            (user_id, code_hash, expires_at, datetime.now().isoformat(timespec="seconds")))
+        self._db.commit()
+
+    def get_reset(self, user_id: str) -> Optional[Dict[str, Any]]:
+        row = self._db.execute(
+            "SELECT * FROM password_resets WHERE user_id=?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+    def delete_reset(self, user_id: str) -> None:
+        self._db.execute("DELETE FROM password_resets WHERE user_id=?", (user_id,))
+        self._db.commit()
+
+    def update_password(self, user_id: str, password_hash: str) -> None:
+        self._db.execute("UPDATE users SET password_hash=? WHERE id=?",
+                         (password_hash, user_id))
+        self._db.commit()
+
+    def delete_sessions_for_user(self, user_id: str) -> None:
+        """Cabut semua sesi aktif user (dipakai setelah reset sandi)."""
+        self._db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
         self._db.commit()
 
     # ------------------------------------------------------------------ #

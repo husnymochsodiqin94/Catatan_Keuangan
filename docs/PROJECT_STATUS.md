@@ -1,6 +1,6 @@
 # PROJECT STATUS
 
-_Terakhir diperbarui: 2026-09-12_
+_Terakhir diperbarui: 2026-10-28_
 
 ## Fase Saat Ini
 **Tahap 12 — Fitur lengkap MVP+: budget/target/alert, edit, auth opsional, layout desktop.** PWA + backend Python stdlib + SQLite. Smoke-test end-to-end OK.
@@ -75,6 +75,7 @@ Berfungsi: capture (suara/teks) → parse → konfirmasi → simpan; dashboard; 
   - **Safe-to-Spend harian**: `budgeting.evaluate` menambah `safe_to_spend` = sisa batas bulanan / sisa hari bulan berjalan (0 bila over). Ditampilkan sebagai kartu di **Anggaran**.
 - [x] **Taksonomi kategori (listing)** `nlp/taxonomy.py` — sumber kebenaran tunggal: 3 kategori Pemasukan + 8 kategori Pengeluaran, masing-masing dengan subkategori & keyword (dari dokumen taksonomi user). Parser rule-based memakai keyword untuk mengisi kategori/subkategori dan **menentukan tipe dari grup kategori** (mis. "dividen" → income). Endpoint publik `GET /api/categories` menyajikan listing terkelompok. Dropdown Kategori di draft kini **berkelompok (`optgroup`) per kategori utama + subkategori**, tersaring sesuai jenis (pemasukan/pengeluaran). Perbaikan regresi: kata kunci tipe (transfer/refund/income/expense) dicocokkan **per-kata** agar "tf" tak salah cocok di "ne**tf**lix". Service worker `ck-shell-v5`. **91 test OK**.
 - [x] **Audit MVP** (`docs/AUDIT_REPORT.md`): financial accuracy, AI, security, performance, token/AI-cost. Defect diperbaiki: A1 splitter "hari lalu", A2 angka frasa waktu jadi nominal, P1 repeated processing di `net_worth`. Regresi `TestTemporalNotAmount` ditambahkan.
+- [x] **Lupa Kata Sandi (reset via email)**: alur self-service tanpa ngulik server. Tabel `password_resets` (kode OTP 6 digit di-hash SHA-256, TTL 15 menit). `service.request_password_reset` (anti account-enumeration: selalu balas `sent:true` bila email aktif, kode hanya dibuat bila user ada; `smtp_off:true` bila SMTP belum dikonfigurasi) + `service.reset_password` (verifikasi kode → ganti sandi → **cabut semua sesi lama**). Endpoint publik `POST /api/auth/forgot` & `/api/auth/reset`; rate-limit anti brute-force. Frontend: link "Lupa Kata Sandi?" → layar input email → layar kode + sandi baru. Dev tanpa SMTP: `CATATAN_2FA_DEV=1` menampilkan kode. SW `ck-shell-v18`. **119 test OK**.
 
 ## Temuan Audit Terbuka (belum dikerjakan — bukan defect diam-diam)
 - [ ] **A3** — Intent "bayar kartu kredit ... dari BCA" belum dikenali sebagai transfer bank→CC (potensi double counting bila di-commit tanpa koreksi). Mitigasi: konfirmasi/koreksi draft. Perbaikan = fitur baru (butuh resolusi akun CC).

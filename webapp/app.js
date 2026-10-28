@@ -58,8 +58,66 @@ function showAuth(mode) {
   $("au-go").addEventListener("click", submit);
   $("au-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
   $("au-switch").addEventListener("click", () => showAuth(login ? "register" : "login"));
-  const fg = $("au-forgot"); if (fg) fg.addEventListener("click", () => toast("Fitur reset kata sandi segera hadir"));
+  const fg = $("au-forgot"); if (fg) fg.addEventListener("click", () => showForgot(($("au-email").value || "").trim()));
   $("view").querySelectorAll("[data-soon]").forEach((el) => el.addEventListener("click", () => toast("Fitur ini segera hadir")));
+}
+
+function showForgot(prefill) {
+  VIEW = "__auth";
+  $("topbar").innerHTML = ""; $("nav").innerHTML = ""; $("fab").hidden = true;
+  $("view").innerHTML = `<div class="auth">
+    <div class="logo">${MIC_SVG}</div>
+    <h1>Lupa Kata Sandi</h1>
+    <p class="muted">Masukkan email akun Anda. Kami kirim kode 6 digit untuk membuat kata sandi baru.</p>
+    <label class="fl">Email</label>
+    <input class="field" id="fp-email" type="email" placeholder="Alamat email Anda" value="${esc(prefill || "")}" />
+    <button class="btn primary" id="fp-go" style="margin-top:16px">KIRIM KODE</button>
+    <div style="text-align:center;margin-top:16px" class="muted"><a id="fp-back" style="cursor:pointer">Kembali ke Masuk</a></div>
+  </div>`;
+  const submit = async () => {
+    const email = ($("fp-email").value || "").trim();
+    if (!email) return toast("Isi email Anda", true);
+    try {
+      const out = await api("POST", "/api/auth/forgot", { email });
+      if (out.smtp_off) return toast("Reset via email belum aktif di server ini. Hubungi admin.", true);
+      showReset(email, out);
+    } catch (e) { toast(e.message, true); }
+  };
+  $("fp-go").addEventListener("click", submit);
+  $("fp-email").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+  $("fp-back").addEventListener("click", () => showAuth("login"));
+}
+
+function showReset(email, info) {
+  info = info || {};
+  VIEW = "__auth";
+  $("topbar").innerHTML = ""; $("nav").innerHTML = ""; $("fab").hidden = true;
+  $("view").innerHTML = `<div class="auth">
+    <div class="logo">${MIC_SVG}</div>
+    <h1>Atur Ulang Sandi</h1>
+    <p class="muted">Kami kirim kode ke <b>${esc(info.email || email)}</b>. Berlaku ${info.expires_in_min || 15} menit.</p>
+    ${info.dev_code ? `<div class="banner">Kode dev: <b>${esc(info.dev_code)}</b></div>` : ""}
+    <label class="fl">Kode Verifikasi</label>
+    <input class="field" id="rs-code" inputmode="numeric" maxlength="6" placeholder="6 digit" value="${info.dev_code ? esc(info.dev_code) : ""}" />
+    <label class="fl">Kata Sandi Baru</label>
+    <input class="field" id="rs-pass" type="password" placeholder="Minimal 6 karakter" />
+    <button class="btn primary" id="rs-go" style="margin-top:16px">SIMPAN SANDI BARU</button>
+    <div style="text-align:center;margin-top:16px" class="muted"><a id="rs-back" style="cursor:pointer">Kembali ke Masuk</a></div>
+  </div>`;
+  const submit = async () => {
+    const code = ($("rs-code").value || "").trim();
+    const pass = $("rs-pass").value || "";
+    if (code.length < 6) return toast("Masukkan 6 digit kode", true);
+    if (pass.length < 6) return toast("Kata sandi minimal 6 karakter", true);
+    try {
+      await api("POST", "/api/auth/reset", { email, code, new_password: pass });
+      toast("Kata sandi berhasil diubah. Silakan masuk.");
+      showAuth("login");
+    } catch (e) { toast(e.message, true); }
+  };
+  $("rs-go").addEventListener("click", submit);
+  $("rs-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+  $("rs-back").addEventListener("click", () => showAuth("login"));
 }
 
 function showTwoFA(email, info) {
